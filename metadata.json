@@ -1,0 +1,6 @@
+{
+  "name": "FactoryOps - Multi-Factory Operations & Maintenance Platform",
+  "description": "Enterprise AI operations platform for multi-factory operations, SOP knowledge, issue triage, maintenance tracking, and production workflow intelligence.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

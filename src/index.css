@@ -1,0 +1,132 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Manrope', 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+  --color-canvas: #FBFEF9;
+  --color-charcoal: #191923;
+  --color-accent: #0E79B2;
+}
+
+@layer base {
+  :root {
+    --canvas: #FBFEF9;
+    --charcoal: #191923;
+    --accent: #0E79B2;
+  }
+
+  body {
+    background-color: #FBFEF9;
+    color: #191923;
+    font-family: var(--font-sans);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  code, kbd, samp, pre, .font-mono {
+    font-family: var(--font-mono);
+  }
+}
+
+/* Custom scrollbars for high-density enterprise tables */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glassmorphism & Cybernetic Animations for FactoryOps Login */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-7px); }
+}
+
+@keyframes floatSlowReverse {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(7px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 0.5; filter: drop-shadow(0 0 15px rgba(14,121,178,0.4)); }
+  50% { opacity: 0.9; filter: drop-shadow(0 0 30px rgba(14,121,178,0.75)); }
+}
+
+@keyframes waveMove {
+  0% { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes armShoulderRotate {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(12deg); }
+}
+
+@keyframes armElbowArticulate {
+  0%, 100% { transform: rotate(10deg); }
+  50% { transform: rotate(-25deg); }
+}
+
+@keyframes armWristRotate {
+  0%, 100% { transform: rotate(0deg); }
+  33% { transform: rotate(20deg); }
+  66% { transform: rotate(-15deg); }
+}
+
+@keyframes weldSpark {
+  0%, 100% { opacity: 0; transform: scale(0.8); }
+  20%, 40% { opacity: 1; transform: scale(1.4); }
+  60% { opacity: 0.3; transform: scale(1); }
+}
+
+.animate-float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: floatSlowReverse 7s ease-in-out infinite;
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 4s ease-in-out infinite;
+}
+
+.animate-wave {
+  stroke-dasharray: 200;
+  animation: waveMove 5s linear infinite;
+}
+
+.animate-shoulder {
+  transform-origin: 100px 80px;
+  animation: armShoulderRotate 8s ease-in-out infinite;
+}
+
+.animate-elbow {
+  transform-origin: 50px -180px;
+  animation: armElbowArticulate 6s ease-in-out infinite;
+}
+
+.animate-wrist {
+  transform-origin: 5 -160px;
+  animation: armWristRotate 7s ease-in-out infinite;
+}
+
+.animate-weld {
+  animation: weldSpark 1.5s ease-in-out infinite;
+}
+
