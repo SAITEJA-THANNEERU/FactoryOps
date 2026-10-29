@@ -90,7 +90,7 @@ export const LoginPage: React.FC = () => {
           <Logo className="w-9 h-9" />
           <div className="flex flex-col">
             <span className="font-extrabold text-base tracking-tight text-slate-900 font-display leading-none">Factory<span className="text-[#0E79B2]">Ops</span></span>
-            <span className="text-[11px] font-medium text-slate-500 tracking-normal font-sans mt-0.5">Smart Factory Operations Platform</span>
+            <span className="text-[11px] font-medium text-slate-500 tracking-normal font-sans mt-0.5">Smart Factory Operations & Maintenance Platform</span>
           </div>
         </div>
 
@@ -124,7 +124,7 @@ export const LoginPage: React.FC = () => {
                 Factory<span className="text-[#0E79B2]">Ops</span>
               </h1>
               <p className="mt-1 text-center text-xs text-slate-600 font-medium tracking-wide">
-                Smart Factory Operations & Telemetry Platform
+                Smart Factory Operations & Maintenance Platform
               </p>
 
               {/* Unified Platform Description */}
