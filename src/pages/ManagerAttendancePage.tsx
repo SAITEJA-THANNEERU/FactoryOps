@@ -53,12 +53,11 @@ export const ManagerAttendancePage: React.FC = () => {
         date: selectedDateFilter || undefined
       });
 
-      // Strict client-side check to guarantee zero leakage: only TECHNICIAN / OPERATOR
-      const verifiedTechRecords = data.records.filter(
-        r => r.user_role === 'TECHNICIAN' || r.user_role === 'OPERATOR'
+      const verifiedTeamRecords = data.records.filter(
+        r => r.user_role === 'TECHNICIAN' || r.user_role === 'OPERATOR' || r.user_role === 'PRODUCTION_PLANNER'
       );
 
-      setRecords(verifiedTechRecords);
+      setRecords(verifiedTeamRecords);
       setKpis(data.kpis);
     } catch (err: any) {
       console.error('Failed to load manager attendance records:', err);

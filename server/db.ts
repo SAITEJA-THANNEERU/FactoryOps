@@ -137,6 +137,29 @@ class FactoryOpsDatabase {
           if (this.spareParts.length === 0) {
             this.seedSpareParts();
           }
+          const todayStr = '2026-10-30';
+          if (!this.attendanceRecords.some(r => r.user_id === 'USR-015' && r.attendance_date === todayStr)) {
+            this.attendanceRecords.unshift({
+              id: `ATT-USR-015-${todayStr}`,
+              user_id: 'USR-015',
+              user_name: 'Priya Sundaram',
+              user_email: 'planner.apex@factoryops.com',
+              user_role: 'PRODUCTION_PLANNER',
+              factory_id: 'FAC-001',
+              attendance_date: todayStr,
+              timestamp: `${todayStr}T08:41:34.000Z`,
+              status: 'Present',
+              check_in_time: '08:41:34',
+              latitude: 17.4435,
+              longitude: 78.3772,
+              distance_meters: 2,
+              is_verified: true,
+              verification_method: 'GPS_GEOFENCE',
+              verification_notes: 'GPS location verified within 1 km geofence (2m from factory center)',
+              created_at: `${todayStr}T08:41:34.000Z`
+            });
+            this.persist();
+          }
           console.log(`✅ [FactoryOpsDatabase] Loaded persistent state from disk (${this.machines.length} machines, ${this.workOrders.length} work orders, ${this.spareParts.length} spare parts).`);
           return true;
         }
@@ -557,6 +580,29 @@ class FactoryOpsDatabase {
           verification_notes: `Verified within 1km geofence (${distance}m from factory center)`,
           created_at: new Date(recordDate.setHours(checkInHour, checkInMin, checkInSec)).toISOString()
         });
+      });
+    }
+
+    const todayStr = '2026-10-30';
+    if (!this.attendanceRecords.some(r => r.user_id === 'USR-015' && r.attendance_date === todayStr)) {
+      this.attendanceRecords.unshift({
+        id: `ATT-USR-015-${todayStr}`,
+        user_id: 'USR-015',
+        user_name: 'Priya Sundaram',
+        user_email: 'planner.apex@factoryops.com',
+        user_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        attendance_date: todayStr,
+        timestamp: `${todayStr}T08:41:34.000Z`,
+        status: 'Present',
+        check_in_time: '08:41:34',
+        latitude: 17.4435,
+        longitude: 78.3772,
+        distance_meters: 2,
+        is_verified: true,
+        verification_method: 'GPS_GEOFENCE',
+        verification_notes: 'GPS location verified within 1 km geofence (2m from factory center)',
+        created_at: `${todayStr}T08:41:34.000Z`
       });
     }
   }

@@ -686,22 +686,62 @@ app.get('/api/attendance/admin', authenticate, authorizeRole('ADMIN', 'SUPER_ADM
   });
 });
 
-// 7. Manager Attendance View (TECHNICIANS ONLY - Strict RBAC filtering)
+// 7. Manager Attendance View (Technicians & Production Planners - Team Attendance)
 app.get('/api/attendance/manager', authenticate, authorizeRole('MANAGER_SUPERVISOR', 'ADMIN', 'SUPER_ADMIN'), (req: AuthenticatedRequest, res: Response): void => {
   const factoryId = getResolvedFactoryId(req) || req.user?.factory_id || 'FAC-001';
   const { date, status, employee } = req.query;
 
-  // STRICT ENFORCEMENT: Managers can ONLY view Technicians
+  // Team roles: Technicians AND Production Planners
+  const allowedRoles = ['TECHNICIAN', 'OPERATOR', 'PRODUCTION_PLANNER'];
+
+  // All team members belonging to this factory
+  const teamUsers = db.users.filter(u =>
+    (!factoryId || u.factory_id === factoryId) &&
+    allowedRoles.includes(u.role)
+  );
+
   let records = db.attendanceRecords.filter(r => {
     const matchFactory = !factoryId || r.factory_id === factoryId;
-    const isTechnician = r.user_role === 'TECHNICIAN' || r.user_role === 'OPERATOR';
-    return matchFactory && isTechnician;
+    const isTeamMember = allowedRoles.includes(r.user_role);
+    return matchFactory && isTeamMember;
   });
 
   if (date) {
-    records = records.filter(r => r.attendance_date === date);
+    const dateStr = String(date);
+    const dateRecords = records.filter(r => r.attendance_date === dateStr);
+
+    // Identify which team employees have not checked in or are absent for this date
+    const recordedUserIds = new Set(dateRecords.map(r => r.user_id));
+    const missingRecords: AttendanceRecord[] = [];
+
+    teamUsers.forEach(u => {
+      if (!recordedUserIds.has(u.id)) {
+        missingRecords.push({
+          id: `ATT-${u.id}-${dateStr}`,
+          user_id: u.id,
+          user_name: u.name,
+          user_email: u.email,
+          user_role: u.role as any,
+          factory_id: factoryId,
+          attendance_date: dateStr,
+          timestamp: new Date().toISOString(),
+          status: 'Absent',
+          check_in_time: '--',
+          latitude: null,
+          longitude: null,
+          distance_meters: null,
+          is_verified: false,
+          verification_method: 'MANUAL_AUDITED_EXCEPTION',
+          verification_notes: 'Not Checked In / Absent',
+          created_at: new Date().toISOString()
+        });
+      }
+    });
+
+    records = [...dateRecords, ...missingRecords];
   }
-  if (status) {
+
+  if (status && status !== 'ALL') {
     records = records.filter(r => r.status === status);
   }
   if (employee) {
@@ -713,26 +753,19 @@ app.get('/api/attendance/manager', authenticate, authorizeRole('MANAGER_SUPERVIS
 
   // Compute team KPIs
   const today = new Date().toISOString().split('T')[0];
-  const todayRecords = db.attendanceRecords.filter(r =>
-    r.attendance_date === today &&
-    (!factoryId || r.factory_id === factoryId) &&
-    (r.user_role === 'TECHNICIAN' || r.user_role === 'OPERATOR')
-  );
-  const totalTeamTechnicians = db.users.filter(u =>
-    (!factoryId || u.factory_id === factoryId) &&
-    (u.role === 'TECHNICIAN' || u.role === 'OPERATOR')
-  ).length || 5;
-
-  const presentToday = todayRecords.filter(r => r.status === 'Present').length;
-  const absentToday = todayRecords.filter(r => r.status === 'Absent').length;
+  const queryDate = date ? String(date) : today;
+  const targetDayRecords = records.filter(r => r.attendance_date === queryDate);
+  const totalTeamMembers = teamUsers.length || 2;
+  const presentToday = targetDayRecords.filter(r => r.status === 'Present').length;
+  const absentToday = targetDayRecords.filter(r => r.status === 'Absent').length;
 
   res.json({
     records,
     kpis: {
-      totalTeamTechnicians,
+      totalTeamTechnicians: totalTeamMembers,
       presentToday,
       absentToday,
-      attendanceRatePct: totalTeamTechnicians > 0 ? Math.round((presentToday / totalTeamTechnicians) * 100) : 0
+      attendanceRatePct: totalTeamMembers > 0 ? Math.round((presentToday / totalTeamMembers) * 100) : 0
     }
   });
 });

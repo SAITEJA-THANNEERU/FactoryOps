@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useRouter } from '../contexts/RouterContext';
 import { api } from '../services/api';
 import type { FactoryLocation, AttendanceRecord, AttendanceAuditLog, AttendanceSummaryKPIs } from '../types';
 import {
@@ -26,7 +27,16 @@ export const AttendanceHubPage: React.FC = () => {
   const isManager = user?.role === 'MANAGER_SUPERVISOR' || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
-  const [activeTab, setActiveTab] = useState<'my' | 'team' | 'admin'>('my');
+  const { currentPath } = useRouter();
+  const [activeTab, setActiveTab] = useState<'my' | 'team' | 'admin'>(() => {
+    if (currentPath === '/team-attendance' || user?.role === 'MANAGER_SUPERVISOR') {
+      return 'team';
+    }
+    if (currentPath === '/admin-attendance') {
+      return 'admin';
+    }
+    return 'my';
+  });
 
   // Personal state
   const [myRecords, setMyRecords] = useState<AttendanceRecord[]>([]);
@@ -80,12 +90,7 @@ export const AttendanceHubPage: React.FC = () => {
   const fetchAdminData = async () => {
     try {
       setLoadingAdmin(true);
-      if (isAdmin) {
-        const res = await api.attendance.getAdminAttendance({ date: filterDate });
-        setAdminRecords(res.records);
-        setAdminKPIs(res.kpis);
-        setAuditLogs(res.auditLogs);
-      } else if (isManager) {
+      if (activeTab === 'team') {
         const res = await api.attendance.getManagerAttendance({ date: filterDate });
         setAdminRecords(res.records);
         setAdminKPIs({
@@ -95,6 +100,11 @@ export const AttendanceHubPage: React.FC = () => {
           attendanceRatePct: res.kpis.attendanceRatePct,
           onTimeCheckIns: res.kpis.presentToday
         });
+      } else if (isAdmin) {
+        const res = await api.attendance.getAdminAttendance({ date: filterDate });
+        setAdminRecords(res.records);
+        setAdminKPIs(res.kpis);
+        setAuditLogs(res.auditLogs);
       }
     } catch (err: any) {
       console.error('Error fetching admin attendance:', err);
@@ -505,6 +515,7 @@ export const AttendanceHubPage: React.FC = () => {
                   <thead className="sticky top-0 z-10 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-4 bg-slate-100">Employee</th>
+                      <th className="py-2.5 px-4 bg-slate-100">Email</th>
                       <th className="py-2.5 px-4 bg-slate-100">Role</th>
                       <th className="py-2.5 px-4 bg-slate-100">Date</th>
                       <th className="py-2.5 px-4 bg-slate-100">Check-In Time</th>
@@ -515,11 +526,23 @@ export const AttendanceHubPage: React.FC = () => {
                   <tbody className="divide-y divide-slate-100 bg-white">
                     {adminRecords.map(r => (
                       <tr key={r.id} className="hover:bg-slate-50/80 transition-colors h-[41px]">
-                        <td className="py-2.5 px-4">
-                          <div className="font-bold text-slate-900">{r.user_name}</div>
-                          <div className="text-[10.5px] text-slate-400">{r.user_email}</div>
+                        <td className="py-2.5 px-4 font-bold text-slate-900">
+                          {r.user_name}
                         </td>
-                        <td className="py-2.5 px-4 font-semibold text-slate-700">{r.user_role}</td>
+                        <td className="py-2.5 px-4 font-mono text-slate-600 text-xs">
+                          {r.user_email}
+                        </td>
+                        <td className="py-2.5 px-4">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10.5px] font-bold font-mono ${
+                              r.user_role === 'PRODUCTION_PLANNER'
+                                ? 'bg-purple-50 text-purple-700 border border-purple-200'
+                                : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            }`}
+                          >
+                            {r.user_role}
+                          </span>
+                        </td>
                         <td className="py-2.5 px-4 font-mono font-medium text-slate-800">{r.attendance_date}</td>
                         <td className="py-2.5 px-4 font-mono font-bold text-slate-900">{r.check_in_time}</td>
                         <td className="py-2.5 px-4">
@@ -527,20 +550,20 @@ export const AttendanceHubPage: React.FC = () => {
                             className={`px-2 py-0.5 rounded text-[10.5px] font-bold ${
                               r.status === 'Present'
                                 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border border-rose-200'
                             }`}
                           >
                             {r.status}
                           </span>
                         </td>
-                        <td className="py-2.5 px-4 text-slate-600">
-                          {r.verification_notes || r.verification_method}
+                        <td className="py-2.5 px-4 text-slate-600 text-xs">
+                          {r.verification_notes || r.verification_method || (r.status === 'Absent' ? 'Not Checked In / Absent' : 'N/A')}
                         </td>
                       </tr>
                     ))}
                     {adminRecords.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                        <td colSpan={7} className="py-8 text-center text-slate-400 text-xs">
                           No team attendance records found for this date.
                         </td>
                       </tr>
@@ -549,7 +572,7 @@ export const AttendanceHubPage: React.FC = () => {
                   {adminRecords.length > 0 && (
                     <tfoot className="sticky bottom-0 z-10 bg-slate-50 font-bold text-xs text-slate-800 border-t border-slate-200">
                       <tr>
-                        <td colSpan={3} className="py-2.5 px-4 uppercase tracking-wider text-slate-600 bg-slate-50">
+                        <td colSpan={4} className="py-2.5 px-4 uppercase tracking-wider text-slate-600 bg-slate-50">
                           Total Workforce Records: {adminRecords.length}
                         </td>
                         <td colSpan={3} className="py-2.5 px-4 text-right text-[#0E79B2] bg-slate-50">
