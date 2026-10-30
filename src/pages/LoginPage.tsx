@@ -30,7 +30,7 @@ export const LoginPage: React.FC = () => {
   const prefilledEmail = searchParams.get('email') || '';
   const registeredSuccess = searchParams.get('registered') === 'true';
 
-  const [identifier, setIdentifier] = useState(prefilledEmail || 'employee@factoryops.com');
+  const [identifier, setIdentifier] = useState(prefilledEmail || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -166,7 +166,7 @@ export const LoginPage: React.FC = () => {
                       autoComplete="username"
                       value={identifier}
                       onChange={e => setIdentifier(e.target.value)}
-                      placeholder="e.g. employee@factoryops.com"
+                      placeholder="employee@factoryops.com"
                       className="w-full bg-slate-50 border border-slate-200 focus:bg-white focus:border-[#0E79B2] focus:ring-1 focus:ring-[#0E79B2] rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-[#191923] placeholder-slate-400 transition-all font-mono"
                       required
                     />

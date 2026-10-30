@@ -22,6 +22,7 @@ export const InventoryPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [showOnlyLowStock, setShowOnlyLowStock] = useState<boolean>(false);
 
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -130,12 +131,13 @@ export const InventoryPage: React.FC = () => {
 
   const filteredParts = parts.filter(p => {
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesLowStock = !showOnlyLowStock || p.stock_quantity <= p.min_reorder_level;
     const matchesSearch =
       p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.part_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.supplier.toLowerCase().includes(searchTerm.toLowerCase()) ||
       p.location_bin.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesCategory && matchesLowStock && matchesSearch;
   });
 
   const lowStockParts = parts.filter(p => p.stock_quantity <= p.min_reorder_level);
@@ -239,10 +241,29 @@ export const InventoryPage: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={() => setSelectedCategory('All')}
-            className="px-3 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold self-start md:self-auto transition-colors cursor-pointer"
+            onClick={() => setShowOnlyLowStock(prev => !prev)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold self-start md:self-auto transition-colors cursor-pointer border ${
+              showOnlyLowStock
+                ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                : 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300'
+            }`}
           >
-            View Low Stock SKUs
+            {showOnlyLowStock ? 'Show All Inventory SKUs' : 'View Low Stock SKUs'}
+          </button>
+        </div>
+      )}
+
+      {showOnlyLowStock && (
+        <div className="flex items-center justify-between bg-amber-100/80 border border-amber-300 px-4 py-2 rounded-lg text-xs text-amber-900 font-medium">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-700" />
+            <span>Showing Low Stock SKUs only ({filteredParts.length} matching items).</span>
+          </div>
+          <button
+            onClick={() => setShowOnlyLowStock(false)}
+            className="text-amber-900 hover:text-amber-950 font-bold underline cursor-pointer"
+          >
+            Clear Filter
           </button>
         </div>
       )}

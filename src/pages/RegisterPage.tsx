@@ -113,9 +113,9 @@ export const RegisterPage: React.FC = () => {
       <header className="relative z-30 w-full px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Logo className="w-9 h-9" />
-          <div>
-            <span className="font-extrabold text-base tracking-tight text-slate-900 font-display">Factory<span className="text-[#0E79B2]">Ops</span></span>
-            <span className="text-[11px] font-semibold text-slate-700 bg-gradient-to-r from-slate-100 to-blue-50/50 border border-slate-200/90 px-2.5 py-1 rounded-md hidden sm:inline ml-2.5 font-mono shadow-2xs tracking-wide">Smart Factory Operations & Maintenance Platform</span>
+          <div className="flex flex-col">
+            <span className="font-extrabold text-base tracking-tight text-slate-900 font-display leading-none">Factory<span className="text-[#0E79B2]">Ops</span></span>
+            <span className="text-[11px] font-medium text-slate-500 tracking-normal font-sans mt-0.5">Smart Factory Operations & Maintenance Platform</span>
           </div>
         </div>
 

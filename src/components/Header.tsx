@@ -153,11 +153,9 @@ export const Header: React.FC = () => {
             className="flex items-center gap-3 cursor-pointer group"
           >
             <Logo className="w-9 h-9" />
-            <div>
-              <div className="flex items-center gap-1.5">
-                <span className="text-base font-extrabold tracking-tight text-[#191923]">FactoryOps</span>
-              </div>
-              <p className="text-[10px] text-slate-500 font-medium hidden sm:block">Asset & Operations Intelligence</p>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-base tracking-tight text-slate-900 font-display leading-none">Factory<span className="text-[#0E79B2]">Ops</span></span>
+              <span className="text-[11px] font-medium text-slate-500 tracking-normal font-sans mt-0.5">Smart Factory Operations & Maintenance Platform</span>
             </div>
           </div>
 
