@@ -224,13 +224,13 @@ export const SuperAdminDashboardView: React.FC = () => {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[#191923] font-display">
                 Super Admin Operational Control & Multi-Role Monitor
               </h1>
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-[#0E79B2]/10 text-[#0E79B2] border border-[#0E79B2]/20 font-mono">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#0E79B2] animate-pulse"></span>
-                100% Real Supabase Data
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 font-mono shadow-2xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse"></span>
+                Active Factory: APEX
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Enterprise Central Telemetry • Seamless Observer Access to Admin, Manager, Production Planner, and Technician Consoles
+              Apex Precision Manufacturing (APX-01) Telemetry • Central Observer Access to Admin, Manager, Production Planner, and Technician Consoles
             </p>
           </div>
 
@@ -666,18 +666,19 @@ export const SuperAdminDashboardView: React.FC = () => {
                 <Eye className="w-5 h-5 text-white" />
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-[#0E79B2] font-mono">
-                    Super Admin Observer Mode
-                  </span>
-                  <span className="text-slate-400">•</span>
-                  <span className="text-xs font-semibold text-slate-200">
-                    Inspecting {activeTab === 'admin' ? 'Admin Dashboard' : activeTab === 'manager' ? 'Factory Manager Dashboard' : activeTab === 'planner' ? 'Production Planner Dashboard' : 'Technician Dashboard'}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Rendering 100% live Supabase records. Mutation actions are safeguarded in read-only observer state.
-                </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400 font-mono flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                      Active Factory: APEX
+                    </span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-xs font-semibold text-slate-200">
+                      Inspecting {activeTab === 'admin' ? 'Admin Dashboard' : activeTab === 'manager' ? 'Factory Manager Dashboard' : activeTab === 'planner' ? 'Production Planner Dashboard' : 'Technician Dashboard'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Rendering 100% verified Apex Precision Manufacturing records. Mutation actions are safeguarded in read-only observer state.
+                  </p>
               </div>
             </div>
 

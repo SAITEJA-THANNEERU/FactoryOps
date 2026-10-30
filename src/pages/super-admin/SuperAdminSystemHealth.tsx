@@ -83,10 +83,6 @@ export const SuperAdminSystemHealthPage: React.FC = () => {
 
   const iotPlants = [
     { code: 'FAC-001', name: 'Apex Precision Manufacturing', machines: systemStatus?.activeCounts?.machines ?? 24, reporting: systemStatus?.activeCounts?.machines ?? 24, completeness: '100%', status: 'Synchronized' },
-    { code: 'FAC-002', name: 'Nova Industrial Systems', machines: 18, reporting: 18, completeness: '99.4%', status: 'Synchronized' },
-    { code: 'FAC-003', name: 'Vertex Auto Components', machines: 16, reporting: 16, completeness: '99.9%', status: 'Synchronized' },
-    { code: 'FAC-004', name: 'PrimeTech Manufacturing', machines: 20, reporting: 20, completeness: '98.9%', status: 'Synchronized' },
-    { code: 'FAC-005', name: 'Orion Industrial Works', machines: 12, reporting: 12, completeness: '99.1%', status: 'Synchronized' },
   ];
 
   return (

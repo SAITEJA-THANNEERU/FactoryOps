@@ -120,23 +120,52 @@ class FactoryOpsDatabase {
         const raw = fs.readFileSync(this.persistentFile, 'utf8');
         const state = JSON.parse(raw);
         if (state.machines && state.machines.length > 0) {
-          this.factories = state.factories || [];
-          this.users = state.users || [];
-          this.machines = state.machines || [];
-          this.production = state.production || [];
-          this.maintenance = state.maintenance || [];
-          this.incidents = state.incidents || [];
-          this.workOrders = state.workOrders || [];
-          this.sops = state.sops || [];
-          this.dataQuality = state.dataQuality || [];
-          this.factoryLocations = state.factoryLocations || [];
-          this.attendanceRecords = state.attendanceRecords || [];
+          // Enforce Apex as the sole active factory throughout FactoryOps
+          const apexFactory = {
+            id: 'FAC-001',
+            factory_code: 'APX-01',
+            name: 'Apex Precision Manufacturing',
+            location: 'Hyderabad, Telangana',
+            industry: 'Automotive Components',
+            owner_name: 'Rajesh Kumar',
+            status: 'Operational' as const,
+            capacity: '45,000 units/mo',
+            established_year: 2014,
+            created_at: '2023-01-15T08:00:00Z',
+            last_activity: 'Just now'
+          };
+          this.factories = [apexFactory];
+
+          // All operational users belong to Apex
+          this.users = (state.users || []).map((u: any) => {
+            if (u.role === 'SUPER_ADMIN') {
+              return { ...u, factory_id: null, factory_name: undefined };
+            }
+            return {
+              ...u,
+              factory_id: 'FAC-001',
+              factory_name: 'Apex Precision Manufacturing'
+            };
+          });
+
+          // Retain exclusively Apex records
+          this.machines = (state.machines || []).filter((m: any) => !m.factory_id || m.factory_id === 'FAC-001');
+          this.production = (state.production || []).filter((p: any) => !p.factory_id || p.factory_id === 'FAC-001');
+          this.maintenance = (state.maintenance || []).filter((m: any) => !m.factory_id || m.factory_id === 'FAC-001');
+          this.incidents = (state.incidents || []).filter((i: any) => !i.factory_id || i.factory_id === 'FAC-001');
+          this.workOrders = (state.workOrders || []).filter((w: any) => !w.factory_id || w.factory_id === 'FAC-001');
+          this.sops = (state.sops || []).filter((s: any) => !s.factory_id || s.factory_id === 'FAC-001');
+          this.dataQuality = (state.dataQuality || []).filter((d: any) => !d.factory_id || d.factory_id === 'FAC-001');
+          this.factoryLocations = (state.factoryLocations || []).filter((l: any) => l.factory_id === 'FAC-001');
+          this.attendanceRecords = (state.attendanceRecords || []).filter((a: any) => !a.factory_id || a.factory_id === 'FAC-001');
+          this.spareParts = (state.spareParts || []).filter((p: any) => !p.factory_id || p.factory_id === 'FAC-001');
           this.attendanceAuditLogs = state.attendanceAuditLogs || [];
-          this.spareParts = state.spareParts || [];
-          this.systemAuditLogs = state.systemAuditLogs || [];
+          this.systemAuditLogs = (state.systemAuditLogs || []).filter((s: any) => !s.factory_id || s.factory_id === 'FAC-001');
+
           if (this.spareParts.length === 0) {
             this.seedSpareParts();
           }
+
           const todayStr = '2026-10-30';
           if (!this.attendanceRecords.some(r => r.user_id === 'USR-015' && r.attendance_date === todayStr)) {
             this.attendanceRecords.unshift({
@@ -158,9 +187,10 @@ class FactoryOpsDatabase {
               verification_notes: 'GPS location verified within 1 km geofence (2m from factory center)',
               created_at: `${todayStr}T08:41:34.000Z`
             });
-            this.persist();
           }
-          console.log(`✅ [FactoryOpsDatabase] Loaded persistent state from disk (${this.machines.length} machines, ${this.workOrders.length} work orders, ${this.spareParts.length} spare parts).`);
+
+          this.persist();
+          console.log(`✅ [FactoryOpsDatabase] Single-Factory System (APEX): Loaded ${this.machines.length} machines, ${this.production.length} production runs, ${this.workOrders.length} work orders, ${this.users.length} users.`);
           return true;
         }
       }
@@ -171,7 +201,7 @@ class FactoryOpsDatabase {
   }
 
   private seedDatabase() {
-    // 1. Seed the 5 Demo Factories
+    // 1. Seed the Single Project Factory (APEX)
     this.factories = [
       {
         id: 'FAC-001',
@@ -184,63 +214,11 @@ class FactoryOpsDatabase {
         capacity: '45,000 units/mo',
         established_year: 2014,
         created_at: '2023-01-15T08:00:00Z',
-        last_activity: '10 mins ago'
-      },
-      {
-        id: 'FAC-002',
-        factory_code: 'NOV-02',
-        name: 'Nova Industrial Systems',
-        location: 'Pune, Maharashtra',
-        industry: 'Engineering Components',
-        owner_name: 'Vikram Malhotra',
-        status: 'Operational',
-        capacity: '38,000 units/mo',
-        established_year: 2017,
-        created_at: '2023-03-20T09:30:00Z',
-        last_activity: '25 mins ago'
-      },
-      {
-        id: 'FAC-003',
-        factory_code: 'VTX-03',
-        name: 'Vertex Auto Components',
-        location: 'Chennai, Tamil Nadu',
-        industry: 'Automotive',
-        owner_name: 'Suresh Raman',
-        status: 'Operational',
-        capacity: '52,000 units/mo',
-        established_year: 2011,
-        created_at: '2023-05-10T10:15:00Z',
-        last_activity: '5 mins ago'
-      },
-      {
-        id: 'FAC-004',
-        factory_code: 'PRM-04',
-        name: 'PrimeTech Manufacturing',
-        location: 'Bengaluru, Karnataka',
-        industry: 'Electronics',
-        owner_name: 'Ananya Sharma',
-        status: 'Production Slowdown',
-        capacity: '80,000 units/mo',
-        established_year: 2019,
-        created_at: '2023-08-01T11:00:00Z',
-        last_activity: '1 hour ago'
-      },
-      {
-        id: 'FAC-005',
-        factory_code: 'ORN-05',
-        name: 'Orion Industrial Works',
-        location: 'Coimbatore, Tamil Nadu',
-        industry: 'Heavy Engineering',
-        owner_name: 'K. Swaminathan',
-        status: 'Maintenance Alert',
-        capacity: '25,000 units/mo',
-        established_year: 2008,
-        created_at: '2023-11-12T14:45:00Z',
-        last_activity: '40 mins ago'
+        last_activity: 'Just now'
       }
     ];
 
-    // 2. Seed Users with securely hashed passwords
+    // 2. Seed Users with securely hashed passwords - all operational users belong to Apex
     const seedUser = (
       id: string,
       name: string,
@@ -266,42 +244,38 @@ class FactoryOpsDatabase {
       });
     };
 
-    // 1. Super Admin
+    // 1. Super Admin (Global Administrator)
     seedUser('USR-001', 'Super Admin Officer', 'superadmin@factoryops.com', 'SuperAdmin@123', 'SUPER_ADMIN', null);
 
-    // 2. Admins (Primary Role) + Legacy Owner Aliases
+    // 2. Admins (Primary Role) + Legacy Owner Aliases (Associated with Apex)
     seedUser('USR-002', 'Rajesh Kumar (Plant Admin)', 'admin.apex@factoryops.com', 'Admin@123', 'ADMIN', 'FAC-001');
     seedUser('USR-002L', 'Rajesh Kumar', 'owner.apex@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-001');
-    seedUser('USR-003', 'Vikram Malhotra (Plant Admin)', 'admin.nova@factoryops.com', 'Admin@123', 'ADMIN', 'FAC-002');
-    seedUser('USR-003L', 'Vikram Malhotra', 'owner.nova@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-002');
-    seedUser('USR-004', 'Suresh Raman (Plant Admin)', 'admin.vertex@factoryops.com', 'Admin@123', 'ADMIN', 'FAC-003');
-    seedUser('USR-004L', 'Suresh Raman', 'owner.vertex@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-003');
-    seedUser('USR-005', 'Ananya Sharma', 'owner.primetech@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-004');
-    seedUser('USR-006', 'K. Swaminathan', 'owner.orion@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-005');
+    seedUser('USR-003', 'Vikram Malhotra (Plant Admin)', 'admin.nova@factoryops.com', 'Admin@123', 'ADMIN', 'FAC-001');
+    seedUser('USR-003L', 'Vikram Malhotra', 'owner.nova@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-001');
+    seedUser('USR-004', 'Suresh Raman (Plant Admin)', 'admin.vertex@factoryops.com', 'Admin@123', 'ADMIN', 'FAC-001');
+    seedUser('USR-004L', 'Suresh Raman', 'owner.vertex@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-001');
+    seedUser('USR-005', 'Ananya Sharma', 'owner.primetech@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-001');
+    seedUser('USR-006', 'K. Swaminathan', 'owner.orion@factoryops.com', 'Factory@123', 'ADMIN', 'FAC-001');
 
-    // 3. Manager / Supervisors (Primary Role)
+    // 3. Manager / Supervisors (Primary Role - Associated with Apex)
     seedUser('USR-007', 'Amit Deshmukh (Manager/Supervisor)', 'manager.apex@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-001');
-    seedUser('USR-008', 'Neha Joshi (Manager/Supervisor)', 'manager.nova@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-002');
-    seedUser('USR-009', 'Karthik Raja (Manager/Supervisor)', 'manager.vertex@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-003');
-    seedUser('USR-010', 'Rahul Hegde', 'manager.primetech@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-004');
-    seedUser('USR-011', 'Manoj Pillai', 'manager.orion@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-005');
+    seedUser('USR-008', 'Neha Joshi (Manager/Supervisor)', 'manager.nova@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-001');
+    seedUser('USR-009', 'Karthik Raja (Manager/Supervisor)', 'manager.vertex@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-001');
+    seedUser('USR-010', 'Rahul Hegde', 'manager.primetech@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-001');
+    seedUser('USR-011', 'Manoj Pillai', 'manager.orion@factoryops.com', 'Manager@123', 'MANAGER_SUPERVISOR', 'FAC-001');
 
-    // 4. Technicians (Primary Role)
+    // 4. Technicians (Primary Role - Associated with Apex)
     seedUser('USR-012', 'Ramesh Varma (Senior Technician)', 'tech.apex@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
-    seedUser('USR-013', 'Anil Sharma (Technician)', 'tech.nova@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-002');
-    seedUser('USR-014', 'Praveen Nair (Technician)', 'tech.vertex@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-003');
+    seedUser('USR-013', 'Anil Sharma (Technician)', 'tech.nova@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
+    seedUser('USR-014', 'Praveen Nair (Technician)', 'tech.vertex@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
 
-    // 5. Production Planners (Primary Role)
+    // 5. Production Planners (Primary Role - Associated with Apex)
     seedUser('USR-015', 'Priya Sundaram (Production Planner)', 'planner.apex@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-001');
-    seedUser('USR-016', 'Siddharth Rao (Production Planner)', 'planner.nova@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-002');
-    seedUser('USR-017', 'Deepa Krishnan (Production Planner)', 'planner.vertex@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-003');
+    seedUser('USR-016', 'Siddharth Rao (Production Planner)', 'planner.nova@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-001');
+    seedUser('USR-017', 'Deepa Krishnan (Production Planner)', 'planner.vertex@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-001');
 
-    // 3. Seed Factory Operational Data from intended Cleaned Datasets
+    // 3. Seed Factory Operational Data from intended Cleaned Datasets (APEX ONLY)
     this.loadCleanedDatasetsForApex(); // Apex (FAC-001) - 24 Cleaned Machines, 6,480 Production Runs, 210 Maintenance, 109 Incidents, 129 Work Orders
-    this.seedFactoryB(); // Nova (FAC-002) - 18 machines, Engineering
-    this.seedFactoryC(); // Vertex (FAC-003) - 16 machines, Auto
-    this.seedFactoryD(); // PrimeTech (FAC-004) - 20 machines, Electronics
-    this.seedFactoryE(); // Orion (FAC-005) - 12 machines, Heavy Eng
     this.seedAttendanceData();
     this.seedSpareParts();
   }

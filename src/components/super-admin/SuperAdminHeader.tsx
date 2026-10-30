@@ -58,16 +58,23 @@ export const SuperAdminHeader: React.FC = () => {
                   Super Admin
                 </span>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium hidden sm:block">Multi-Tenant Plant Operations</p>
+              <p className="text-[10px] text-slate-500 font-medium hidden sm:block">Apex Plant Operations</p>
             </div>
           </button>
 
-          <div className="hidden md:flex items-center gap-2 pl-4 border-l border-slate-200">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-purple-500"></span>
-            </span>
-            <span className="text-xs font-medium text-slate-600">Reserved Management Console</span>
+          {/* Prominent Active Factory Indicator */}
+          <div className="flex items-center gap-2 pl-3 sm:pl-4 border-l border-slate-200">
+            <div className="flex items-center gap-2 px-2.5 sm:px-3 py-1 rounded-lg bg-emerald-50/90 border border-emerald-300 text-emerald-900 shadow-2xs">
+              <Building2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5 leading-tight">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Active Factory:</span>
+                  <span className="text-xs font-black text-emerald-950 font-mono tracking-wide">APEX</span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                </div>
+                <span className="text-[9px] text-emerald-700 font-medium leading-none hidden sm:block">Apex Precision Manufacturing (APX-01)</span>
+              </div>
+            </div>
           </div>
         </div>
 

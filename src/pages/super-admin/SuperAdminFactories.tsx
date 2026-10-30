@@ -101,12 +101,12 @@ export const SuperAdminFactoriesPage: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Factory Management</h1>
-            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
-              {filtered.length} of {factories.length} Plants
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+              1 Active Plant: APEX
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Registered manufacturing tenants, operational capacity, and cross-plant administrative governance
+            Active manufacturing plant: Apex Precision Manufacturing (Hyderabad, Telangana) • APX-01
           </p>
         </div>
 

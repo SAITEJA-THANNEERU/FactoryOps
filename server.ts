@@ -98,26 +98,11 @@ function authorizeRole(...allowedRoles: UserRole[]) {
   };
 }
 
-// Helper to determine and enforce factory isolation
+// Helper to determine and enforce factory isolation (Single-Factory: APEX FAC-001)
 function getResolvedFactoryId(req: AuthenticatedRequest, requestedFactoryId?: string): string | null {
   if (!req.user) return null;
-
-  // Super Admin can inspect any factory
-  if (req.user.role === 'SUPER_ADMIN') {
-    return requestedFactoryId || (req.query.factory_id as string) || (req.headers['x-factory-id'] as string) || null;
-  }
-
-  // Factory Owner or Manager is strictly locked to their factory
-  const userFactoryId = req.user.factory_id;
-  if (!userFactoryId) return null;
-
-  // If a specific factory was requested, verify it matches the user's factory
-  const targetId = requestedFactoryId || (req.query.factory_id as string) || (req.headers['x-factory-id'] as string);
-  if (targetId && targetId !== userFactoryId) {
-    return '__FORBIDDEN__';
-  }
-
-  return userFactoryId;
+  // FactoryOps operates strictly in single-factory mode with APEX (FAC-001)
+  return 'FAC-001';
 }
 
 // Audit Event Logger Helper

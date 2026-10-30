@@ -114,8 +114,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsLoading(true);
     setError(null);
 
-    // If activeFactory is present, query factory-specific telemetry; otherwise query global multi-tenant telemetry (Super Admin)
-    const factoryId = activeFactory?.id;
+    // Single-factory mode: Apex (FAC-001) is the sole active factory
+    const factoryId = activeFactory?.id || 'FAC-001';
 
     try {
       const [
@@ -136,7 +136,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         api.workOrders.getAll(factoryId),
         api.sops.getAll(factoryId),
         api.dataQuality.getAll(factoryId),
-        factoryId ? api.factories.getStats(factoryId) : Promise.resolve(null),
+        api.factories.getStats(factoryId),
         api.notifications.getAll().catch(() => null)
       ]);
 

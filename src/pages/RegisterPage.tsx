@@ -86,7 +86,7 @@ export const RegisterPage: React.FC = () => {
         email: res.user.email,
         role: res.user.role,
         roleTitle: roleTitles[res.user.role] || res.user.role,
-        factoryName: res.user.factory_name || 'Austin Gigafactory Precision (APX-01)'
+        factoryName: res.user.factory_name || 'Apex Precision Manufacturing (APX-01)'
       });
     } catch (err: any) {
       setLocalError(err.message || 'Registration failed. Please check your entries.');
@@ -280,7 +280,7 @@ export const RegisterPage: React.FC = () => {
                       <input
                         type="text"
                         disabled
-                        value="Austin Gigafactory (APX-01)"
+                        value="Apex Precision Manufacturing (APX-01)"
                         className="w-full bg-slate-100 border border-slate-200 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-slate-600 cursor-not-allowed font-medium"
                       />
                     </div>
