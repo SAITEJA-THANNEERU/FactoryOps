@@ -24,7 +24,8 @@ import {
   ResponsiveContainer,
   PieChart,
   Pie,
-  Cell
+  Cell,
+  Legend
 } from 'recharts';
 import { Plus, Wrench, AlertTriangle, Cpu, BarChart2, Settings, Clock, Layers } from 'lucide-react';
 
@@ -51,14 +52,43 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 }) => {
   // Machine Slicer filter state: '--' means All
   const [selectedMachineFilter, setSelectedMachineFilter] = useState<string>('--');
+  // Defect Rate Period Filter: 'all' | '2026-07' | '2026-08' | '2026-09'
+  const [defectPeriodFilter, setDefectPeriodFilter] = useState<'all' | '2026-07' | '2026-08' | '2026-09'>('all');
+  // Priority queue toggle: 'pending' (pending workload only) vs 'all' (all work orders)
+  const [priorityQueueMode, setPriorityQueueMode] = useState<'pending' | 'all'>('pending');
+
+  // Enforce unique Apex registered machines (24 unique registered units)
+  const uniqueApexMachines = useMemo(() => {
+    const map = new Map<string, Machine>();
+    machines.forEach(m => {
+      const id = m.machine_id || m.id;
+      if (id && !map.has(id)) {
+        map.set(id, m);
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => (a.machine_id || a.id).localeCompare(b.machine_id || b.id));
+  }, [machines]);
+
+  const machineNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    uniqueApexMachines.forEach(m => {
+      const id = m.machine_id || m.id;
+      map[id] = m.name || m.machine_name || id;
+    });
+    return map;
+  }, [uniqueApexMachines]);
 
   // Filtered operational records
   const filteredMachines = useMemo(() => {
-    if (selectedMachineFilter === '--') return machines;
-    return machines.filter(m => m.name === selectedMachineFilter || m.machine_id === selectedMachineFilter);
-  }, [machines, selectedMachineFilter]);
+    if (selectedMachineFilter === '--') return uniqueApexMachines;
+    return uniqueApexMachines.filter(m => {
+      const id = m.machine_id || m.id;
+      const name = m.name || m.machine_name;
+      return name === selectedMachineFilter || id === selectedMachineFilter;
+    });
+  }, [uniqueApexMachines, selectedMachineFilter]);
 
-  const filteredMachineIds = useMemo(() => new Set(filteredMachines.map(m => m.machine_id)), [filteredMachines]);
+  const filteredMachineIds = useMemo(() => new Set(filteredMachines.map(m => m.machine_id || m.id)), [filteredMachines]);
 
   const filteredProduction = useMemo(() => {
     if (selectedMachineFilter === '--') return production;
@@ -77,6 +107,8 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
 
   // Top 5 KPI Metrics computed from actual operational records
   const totalMachinesCount = filteredMachines.length;
+  const totalRegisteredCount = uniqueApexMachines.length;
+  const totalTelemetryCount = filteredProduction.length;
   
   const totalActualProduction = useMemo(() => {
     return filteredProduction.reduce((sum, p) => sum + (Number(p.actual_units) || 0), 0);
@@ -96,15 +128,27 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
     return filteredProduction.reduce((sum, p) => sum + (Number(p.downtime_minutes) || 0), 0);
   }, [filteredProduction]);
 
-  // Machine status distribution (Donut 1)
+  // Machine status distribution (Donut 1 - based on unique registered machines)
   const statusDistribution = useMemo(() => {
-    const activeCount = filteredMachines.filter(m => m.status === 'Active' || !m.status).length;
-    const maintenanceCount = filteredMachines.filter(m => m.status === 'Maintenance').length;
-    const offlineCount = filteredMachines.filter(m => m.status === 'Offline').length;
+    let activeCount = 0;
+    let maintenanceCount = 0;
+    let faultedCount = 0;
+    let offlineCount = 0;
+
+    filteredMachines.forEach(m => {
+      const s = (m.status || '').toLowerCase();
+      if (s === 'maintenance') maintenanceCount++;
+      else if (s === 'warning' || s === 'faulted') faultedCount++;
+      else if (s === 'offline' || s === 'inactive') offlineCount++;
+      else activeCount++; // 'running', 'active', 'operational'
+    });
+
+    const total = filteredMachines.length || 1;
     return [
-      { name: 'Active', value: activeCount || filteredMachines.length, color: '#00B0FF' },
-      ...(maintenanceCount > 0 ? [{ name: 'Maintenance', value: maintenanceCount, color: '#F59E0B' }] : []),
-      ...(offlineCount > 0 ? [{ name: 'Offline', value: offlineCount, color: '#EF4444' }] : [])
+      { name: 'Active', value: activeCount, color: '#00B0FF', pct: `${Math.round((activeCount / total) * 100)}%` },
+      ...(maintenanceCount > 0 ? [{ name: 'Maintenance', value: maintenanceCount, color: '#F59E0B', pct: `${Math.round((maintenanceCount / total) * 100)}%` }] : []),
+      ...(faultedCount > 0 ? [{ name: 'Faulted', value: faultedCount, color: '#EF4444', pct: `${Math.round((faultedCount / total) * 100)}%` }] : []),
+      ...(offlineCount > 0 ? [{ name: 'Offline', value: offlineCount, color: '#64748B', pct: `${Math.round((offlineCount / total) * 100)}%` }] : [])
     ];
   }, [filteredMachines]);
 
@@ -116,46 +160,76 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       if (counts[sev] !== undefined) counts[sev]++;
       else counts['Medium']++;
     });
+    const total = filteredIncidents.length || 1;
     return [
-      { name: 'High', value: counts.High, color: '#0091EA', pct: '46.79%' },
-      { name: 'Medium', value: counts.Medium, color: '#0D47A1', pct: '43.12%' },
-      { name: 'Low', value: counts.Low, color: '#FF6D00', pct: '7.34%' },
-      { name: 'Critical', value: counts.Critical, color: '#D50000', pct: '2.75%' }
+      { name: 'High', value: counts.High, color: '#0091EA', pct: `${((counts.High / total) * 100).toFixed(1)}%` },
+      { name: 'Medium', value: counts.Medium, color: '#0D47A1', pct: `${((counts.Medium / total) * 100).toFixed(1)}%` },
+      { name: 'Low', value: counts.Low, color: '#FF6D00', pct: `${((counts.Low / total) * 100).toFixed(1)}%` },
+      { name: 'Critical', value: counts.Critical, color: '#D50000', pct: `${((counts.Critical / total) * 100).toFixed(1)}%` }
     ].filter(item => item.value > 0 || selectedMachineFilter === '--');
   }, [filteredIncidents, selectedMachineFilter]);
 
-  // Work Orders by Status (Horizontal Bar)
+  // 1. Work Orders by Status: Overall status distribution of all work orders
   const workOrdersByStatus = useMemo(() => {
-    const statusCounts: Record<string, number> = {
-      Completed: 0,
-      Scheduled: 0,
-      'In Progress': 0,
-      Open: 0,
-      'Pending Parts': 0
-    };
+    const statusCounts: Record<string, number> = {};
     filteredWorkOrders.forEach(w => {
-      const s = w.status;
-      if (s === 'Completed') statusCounts.Completed++;
-      else if (s === 'Scheduled') statusCounts.Scheduled++;
-      else if (s === 'In Progress') statusCounts['In Progress']++;
-      else if (s === 'Open') statusCounts.Open++;
-      else if (s === 'Pending Parts') statusCounts['Pending Parts']++;
-      else statusCounts.Open++;
+      const s = w.status || 'Open';
+      statusCounts[s] = (statusCounts[s] || 0) + 1;
     });
 
-    return [
-      { status: 'Completed', count: statusCounts.Completed },
-      { status: 'Scheduled', count: statusCounts.Scheduled },
-      { status: 'In Progress', count: statusCounts['In Progress'] },
-      { status: 'Open', count: statusCounts.Open },
-      { status: 'Pending Parts', count: statusCounts['Pending Parts'] }
-    ];
+    const total = filteredWorkOrders.length || 1;
+    const colorMap: Record<string, string> = {
+      Completed: '#10B981',
+      Scheduled: '#3B82F6',
+      'In Progress': '#0E79B2',
+      'Pending Parts': '#F59E0B',
+      Open: '#EF4444',
+      Cancelled: '#94A3B8'
+    };
+
+    return Object.entries(statusCounts).map(([status, count]) => ({
+      status,
+      count,
+      pct: `${((count / total) * 100).toFixed(1)}%`,
+      color: colorMap[status] || '#64748B'
+    })).sort((a, b) => b.count - a.count);
   }, [filteredWorkOrders]);
+
+  // 2. Work Order Priority & Execution Queue: Priority-based maintenance workload
+  const workOrderPriorityWorkload = useMemo(() => {
+    const priorities = ['Critical', 'High', 'Medium', 'Low'];
+
+    return priorities.map(priority => {
+      const orders = filteredWorkOrders.filter(w => (w.priority || '').toLowerCase() === priority.toLowerCase());
+      
+      const inProgress = orders.filter(w => w.status === 'In Progress').length;
+      const scheduled = orders.filter(w => w.status === 'Scheduled' || w.status === 'Assigned').length;
+      const open = orders.filter(w => w.status === 'Open').length;
+      const pendingParts = orders.filter(w => w.status === 'Pending Parts' || w.status === 'On Hold').length;
+      const completed = orders.filter(w => w.status === 'Completed').length;
+      const totalPending = inProgress + scheduled + open + pendingParts;
+
+      return {
+        priority,
+        inProgress,
+        scheduled,
+        open,
+        pendingParts,
+        completed,
+        totalPending,
+        totalAll: orders.length
+      };
+    });
+  }, [filteredWorkOrders]);
+
+  const totalPendingWorkOrders = useMemo(() => {
+    return workOrderPriorityWorkload.reduce((sum, p) => sum + p.totalPending, 0);
+  }, [workOrderPriorityWorkload]);
 
   // Production by Machine (Horizontal Bar, descending)
   const productionByMachine = useMemo(() => {
     const map: Record<string, number> = {};
-    production.forEach(p => {
+    filteredProduction.forEach(p => {
       const id = p.machine_id;
       map[id] = (map[id] || 0) + (Number(p.actual_units) || 0);
     });
@@ -166,23 +240,62 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         displayUnits: `${Math.round(actual_units / 1000)}K`
       }))
       .sort((a, b) => b.actual_units - a.actual_units);
-  }, [production]);
+  }, [filteredProduction]);
 
-  // Defects by Machine (Horizontal Bar, descending)
-  const defectsByMachine = useMemo(() => {
-    const map: Record<string, number> = {};
-    production.forEach(p => {
-      const id = p.machine_id;
-      map[id] = (map[id] || 0) + (Number(p.defect_units) || 0);
+  // 3. Machine-Wise Defect Rate (%) = (Total Defects / Total Units Produced) * 100
+  const machineDefectRates = useMemo(() => {
+    let targetProduction = production;
+    if (defectPeriodFilter !== 'all') {
+      targetProduction = targetProduction.filter(p => (p.date || '').startsWith(defectPeriodFilter));
+    }
+    if (selectedMachineFilter !== '--') {
+      targetProduction = targetProduction.filter(p => filteredMachineIds.has(p.machine_id));
+    }
+
+    const machineStats: Record<string, { actualUnits: number; defectUnits: number; logsCount: number }> = {};
+    
+    // Initialize with filtered machines so all registered units appear
+    filteredMachines.forEach(m => {
+      const id = m.machine_id || m.id;
+      machineStats[id] = { actualUnits: 0, defectUnits: 0, logsCount: 0 };
     });
-    return Object.entries(map)
-      .map(([machine_id, defects]) => ({
-        machine_id,
-        defects,
-        displayDefects: defects.toLocaleString()
-      }))
-      .sort((a, b) => b.defects - a.defects);
-  }, [production]);
+
+    targetProduction.forEach(p => {
+      const id = p.machine_id;
+      if (!machineStats[id]) {
+        machineStats[id] = { actualUnits: 0, defectUnits: 0, logsCount: 0 };
+      }
+      machineStats[id].actualUnits += Number(p.actual_units) || 0;
+      machineStats[id].defectUnits += Number(p.defect_units) || 0;
+      machineStats[id].logsCount++;
+    });
+
+    return Object.entries(machineStats)
+      .map(([machine_id, stats]) => {
+        const name = machineNameMap[machine_id] || machine_id;
+        const actual = stats.actualUnits;
+        const defects = stats.defectUnits;
+        // Formula: (Total Defects / Total Units Produced) * 100
+        const rate = actual > 0 ? (defects / actual) * 100 : 0;
+        const goodUnits = Math.max(0, actual - defects);
+        const goodRate = actual > 0 ? (goodUnits / actual) * 100 : 100;
+
+        return {
+          machine_id,
+          name,
+          actual_units: actual,
+          defect_units: defects,
+          good_units: goodUnits,
+          defectRate: Number(rate.toFixed(2)),
+          goodRate: Number(goodRate.toFixed(2)),
+          logsCount: stats.logsCount,
+          displayRate: `${rate.toFixed(2)}%`,
+          displayUnits: formatCompactNumber(actual, 1),
+          displayDefects: defects.toLocaleString()
+        };
+      })
+      .sort((a, b) => b.defectRate - a.defectRate); // Ranked descending by defect rate
+  }, [production, defectPeriodFilter, selectedMachineFilter, filteredMachineIds, filteredMachines, machineNameMap]);
 
   // Production Over Time (Daily line chart)
   const productionOverTime = useMemo(() => {
@@ -240,9 +353,9 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
         <PowerBiCard
           title="TOTAL MACHINES"
-          subtitle="Count of machine_id"
+          subtitle="Unique registered Apex units"
           value={formatWholeNumber(totalMachinesCount)}
-          trendText="100% operational"
+          trendText={`${totalTelemetryCount.toLocaleString()} Telemetry Logs`}
           trendPositive={true}
           icon={<Cpu className="w-4 h-4 text-[#0E79B2]" />}
           iconBg="bg-blue-50 border-blue-100/80"
@@ -290,7 +403,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
         <div className="flex items-center gap-2 text-slate-500">
           <span className="font-bold text-[#191923]">Active Machine Filter:</span>
           <span className="px-2.5 py-1 rounded-md bg-[#0E79B2]/10 text-[#0E79B2] font-mono font-semibold border border-[#0E79B2]/20">
-            {selectedMachineFilter === '--' ? 'All Machines (24)' : selectedMachineFilter}
+            {selectedMachineFilter === '--' ? `All Machines (${totalRegisteredCount} units)` : selectedMachineFilter}
           </span>
         </div>
         {selectedMachineFilter !== '--' && (
@@ -311,7 +424,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           <div className="bg-white rounded-xl border border-[#191923]/10 p-4 shadow-xs">
             <div className="font-bold text-xs uppercase tracking-wider text-[#191923] mb-3 pb-2 border-b border-slate-100 flex items-center justify-between">
               <span>Filter Machine</span>
-              <span className="text-[10px] text-slate-400 font-normal">24 units</span>
+              <span className="text-[10px] text-slate-400 font-normal">{totalRegisteredCount} units</span>
             </div>
             <div className="max-h-[190px] overflow-y-auto space-y-1.5 pr-1 text-xs text-slate-700">
               <label className="flex items-center gap-2 cursor-pointer hover:text-[#0E79B2] transition-colors p-1 rounded hover:bg-slate-50">
@@ -324,23 +437,27 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                 />
                 <span className="font-semibold text-slate-900">All Machines (--)</span>
               </label>
-              {machines.map(m => (
-                <label
-                  key={m.machine_id}
-                  className="flex items-center gap-2 cursor-pointer hover:text-[#0E79B2] transition-colors truncate p-1 rounded hover:bg-slate-50"
-                  title={`${m.name} (${m.machine_id})`}
-                >
-                  <input
-                    type="radio"
-                    name="machine_slicer"
-                    checked={selectedMachineFilter === m.name}
-                    onClick={() => setSelectedMachineFilter(prev => prev === m.name ? '--' : m.name)}
-                    onChange={() => {}}
-                    className="accent-[#0E79B2] cursor-pointer shrink-0"
-                  />
-                  <span className="truncate">{m.name}</span>
-                </label>
-              ))}
+              {uniqueApexMachines.map(m => {
+                const id = m.machine_id || m.id;
+                const name = m.name || m.machine_name || id;
+                return (
+                  <label
+                    key={id}
+                    className="flex items-center gap-2 cursor-pointer hover:text-[#0E79B2] transition-colors truncate p-1 rounded hover:bg-slate-50"
+                    title={`${name} (${id})`}
+                  >
+                    <input
+                      type="radio"
+                      name="machine_slicer"
+                      checked={selectedMachineFilter === name || selectedMachineFilter === id}
+                      onClick={() => setSelectedMachineFilter(prev => (prev === name || prev === id) ? '--' : id)}
+                      onChange={() => {}}
+                      className="accent-[#0E79B2] cursor-pointer shrink-0"
+                    />
+                    <span className="truncate">{id} • {name}</span>
+                  </label>
+                );
+              })}
             </div>
           </div>
 
@@ -443,89 +560,155 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
           </PowerBiVisualContainer>
         </div>
 
-        {/* Middle Column: Work Orders by Status */}
+        {/* Middle Column: Work Orders by Status + Work Order Priority & Execution Queue */}
         <div className="lg:col-span-4 min-w-0 space-y-4">
+          {/* Visual 1: Work Orders by Status */}
           <PowerBiVisualContainer
             title="Work Orders by Status"
-            subtitle="Count of work_order_id and priority status"
+            subtitle="Overall distribution across all work order lifecycle statuses"
             heightClass="h-[325px]"
+            rightAction={
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                {filteredWorkOrders.length} Total
+              </span>
+            }
           >
-            <div className="h-full w-full pt-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={workOrdersByStatus}
-                  layout="vertical"
-                  margin={{ top: 10, right: 35, left: 20, bottom: 25 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                  <XAxis
-                    type="number"
-                    stroke="#94a3b8"
-                    fontSize={10}
-                    domain={[0, 120]}
-                    ticks={[0, 20, 40, 60, 80, 100, 120]}
-                    label={{ value: 'Count of work_order_id', position: 'insideBottom', offset: -15, fill: '#64748b', fontSize: 10 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="status"
-                    stroke="#64748b"
-                    fontSize={10}
-                    width={80}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#191923', fontSize: '11px', borderRadius: '8px' }}
-                    formatter={(val: any) => [val, 'Count']}
-                  />
-                  <Bar dataKey="count" fill="#0E79B2" radius={[0, 4, 4, 0]} label={{ position: 'right', fill: '#191923', fontSize: 11, fontWeight: 'bold' }} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-full w-full pt-1 flex flex-col justify-between">
+              <div className="flex-1 min-h-[220px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={workOrdersByStatus}
+                    layout="vertical"
+                    margin={{ top: 8, right: 40, left: 15, bottom: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis
+                      type="number"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      label={{ value: 'Count of work_order_id', position: 'insideBottom', offset: -12, fill: '#64748b', fontSize: 10 }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="status"
+                      stroke="#64748b"
+                      fontSize={10}
+                      width={85}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#191923', fontSize: '11px', borderRadius: '8px' }}
+                      formatter={(val: any, _, item: any) => [`${val} orders (${item?.payload?.pct})`, 'Total']}
+                    />
+                    <Bar
+                      dataKey="count"
+                      radius={[0, 4, 4, 0]}
+                      label={{ position: 'right', fill: '#191923', fontSize: 11, fontWeight: 'bold' }}
+                    >
+                      {workOrdersByStatus.map((entry, idx) => (
+                        <Cell key={`status-cell-${idx}`} fill={entry.color} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between text-[10px] text-slate-500 gap-1 px-1">
+                {workOrdersByStatus.map(s => (
+                  <div key={s.status} className="flex items-center gap-1">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: s.color }}></span>
+                    <span className="font-medium text-slate-700">{s.status}:</span>
+                    <span className="font-mono font-bold text-slate-900">{s.count}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </PowerBiVisualContainer>
 
-          {/* Second Stacked Work Orders card */}
+          {/* Visual 2: Work Order Priority & Execution Queue */}
           <PowerBiVisualContainer
-            title="Work Order Execution Queue"
-            subtitle="Scheduled, In Progress & Open Work Orders"
+            title="WORK ORDER PRIORITY & EXECUTION QUEUE"
+            subtitle="Maintenance tasks requiring technician action grouped by priority"
             heightClass="h-[325px]"
+            rightAction={
+              <button
+                onClick={() => setPriorityQueueMode(prev => prev === 'pending' ? 'all' : 'pending')}
+                className={`px-2 py-0.5 rounded text-[10px] font-semibold border transition-colors cursor-pointer ${
+                  priorityQueueMode === 'pending'
+                    ? 'bg-amber-50 text-amber-900 border-amber-300'
+                    : 'bg-slate-100 text-slate-700 border-slate-200'
+                }`}
+                title="Toggle between pending execution workload and all orders"
+              >
+                {priorityQueueMode === 'pending' ? `Pending Queue (${totalPendingWorkOrders})` : `All Orders (${filteredWorkOrders.length})`}
+              </button>
+            }
           >
-            <div className="h-full w-full pt-1">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={workOrdersByStatus}
-                  layout="vertical"
-                  margin={{ top: 10, right: 35, left: 20, bottom: 25 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                  <XAxis
-                    type="number"
-                    stroke="#94a3b8"
-                    fontSize={10}
-                    domain={[0, 120]}
-                    ticks={[0, 20, 40, 60, 80, 100, 120]}
-                    label={{ value: 'Count of work_order_id', position: 'insideBottom', offset: -15, fill: '#64748b', fontSize: 10 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="status"
-                    stroke="#64748b"
-                    fontSize={10}
-                    width={80}
-                    tickLine={false}
-                  />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#191923', fontSize: '11px', borderRadius: '8px' }}
-                    formatter={(val: any) => [val, 'Count']}
-                  />
-                  <Bar dataKey="count" fill="#191923" radius={[0, 4, 4, 0]} label={{ position: 'right', fill: '#191923', fontSize: 11, fontWeight: 'bold' }} />
-                </BarChart>
-              </ResponsiveContainer>
+            <div className="h-full w-full pt-1 flex flex-col justify-between">
+              <div className="flex-1 min-h-[200px] pb-3">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={workOrderPriorityWorkload}
+                    layout="vertical"
+                    margin={{ top: 8, right: 35, left: 15, bottom: 22 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                    <XAxis
+                      type="number"
+                      stroke="#94a3b8"
+                      fontSize={10}
+                      label={{ value: priorityQueueMode === 'pending' ? 'Pending Maintenance Workload (Units)' : 'Total Work Orders (Units)', position: 'insideBottom', offset: -12, fill: '#64748b', fontSize: 10 }}
+                    />
+                    <YAxis
+                      type="category"
+                      dataKey="priority"
+                      stroke="#64748b"
+                      fontSize={10}
+                      width={60}
+                      tickLine={false}
+                    />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#191923', fontSize: '11px', borderRadius: '8px' }}
+                      formatter={(val: any, name: any) => [`${val} orders`, name]}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      align="center"
+                      iconSize={8}
+                      wrapperStyle={{
+                        fontSize: '10px',
+                        lineHeight: '14px',
+                        paddingTop: '6px',
+                        bottom: '-2px',
+                        left: 0,
+                        right: 0,
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'center'
+                      }}
+                    />
+                    <Bar dataKey="open" name="Open" stackId="queue" fill="#EF4444" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="scheduled" name="Scheduled" stackId="queue" fill="#6366F1" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="inProgress" name="In Progress" stackId="queue" fill="#0E79B2" radius={[0, 0, 0, 0]} />
+                    <Bar dataKey="pendingParts" name="Pending Parts" stackId="queue" fill="#F59E0B" radius={priorityQueueMode === 'pending' ? [0, 4, 4, 0] : [0, 0, 0, 0]} />
+                    {priorityQueueMode === 'all' && (
+                      <Bar dataKey="completed" name="Completed" stackId="queue" fill="#10B981" radius={[0, 4, 4, 0]} />
+                    )}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[10.5px] px-1 text-slate-600">
+                <span className="font-semibold text-slate-800">
+                  {priorityQueueMode === 'pending' ? 'Active Attention Required:' : 'Priority Distribution:'}
+                </span>
+                <span className="font-mono text-xs font-bold text-amber-700">
+                  {totalPendingWorkOrders} Pending Workload Orders
+                </span>
+              </div>
             </div>
           </PowerBiVisualContainer>
         </div>
 
-        {/* Right Column: Production by Machine + Defects by Machine + Production Over Time */}
+        {/* Right Column: Production by Machine + Machine-Wise Defect Rate (%) + Production Over Time */}
         <div className="lg:col-span-5 min-w-0 space-y-4">
           {/* Production by Machine */}
           <PowerBiVisualContainer
@@ -565,7 +748,7 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                     radius={[0, 4, 4, 0]}
                     label={{ position: 'right', fill: '#64748b', fontSize: 9 }}
                     onClick={(entry: any) => {
-                      const m = machines.find(x => x.machine_id === entry?.machine_id);
+                      const m = uniqueApexMachines.find(x => (x.machine_id || x.id) === entry?.machine_id);
                       if (m) onSelectMachine(m);
                     }}
                     className="cursor-pointer"
@@ -575,24 +758,67 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
             </div>
           </PowerBiVisualContainer>
 
-          {/* Defects by Machine */}
+          {/* Visual 3: MACHINE-WISE DEFECT RATE (%) */}
           <PowerBiVisualContainer
-            title="Defects by Machine"
-            subtitle="Sum of defect_units and Sum of actual_units by machine_id"
+            title="MACHINE-WISE DEFECT RATE (%)"
+            subtitle="(Total Defects / Total Units Produced) × 100 • Ranked descending"
             heightClass="h-[215px]"
+            rightAction={
+              <div className="flex items-center gap-1 bg-slate-50 p-0.5 rounded-lg border border-slate-200">
+                <button
+                  onClick={() => setDefectPeriodFilter('all')}
+                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors cursor-pointer ${
+                    defectPeriodFilter === 'all' ? 'bg-[#0E79B2] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="All time production periods"
+                >
+                  All
+                </button>
+                <button
+                  onClick={() => setDefectPeriodFilter('2026-07')}
+                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors cursor-pointer ${
+                    defectPeriodFilter === '2026-07' ? 'bg-[#0E79B2] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="July 2026 telemetry"
+                >
+                  Jul
+                </button>
+                <button
+                  onClick={() => setDefectPeriodFilter('2026-08')}
+                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors cursor-pointer ${
+                    defectPeriodFilter === '2026-08' ? 'bg-[#0E79B2] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="August 2026 telemetry"
+                >
+                  Aug
+                </button>
+                <button
+                  onClick={() => setDefectPeriodFilter('2026-09')}
+                  className={`px-1.5 py-0.5 text-[9px] font-semibold rounded transition-colors cursor-pointer ${
+                    defectPeriodFilter === '2026-09' ? 'bg-[#0E79B2] text-white shadow-2xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                  title="September 2026 telemetry"
+                >
+                  Sep
+                </button>
+              </div>
+            }
           >
             <div className="h-full w-full overflow-y-auto pr-1">
-              <ResponsiveContainer width="100%" height={Math.max(260, defectsByMachine.length * 24)}>
+              <ResponsiveContainer width="100%" height={Math.max(260, machineDefectRates.length * 24)}>
                 <BarChart
-                  data={defectsByMachine}
+                  data={machineDefectRates}
                   layout="vertical"
-                  margin={{ top: 5, right: 40, left: 10, bottom: 5 }}
+                  margin={{ top: 5, right: 45, left: 10, bottom: 5 }}
                 >
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                   <XAxis
                     type="number"
                     stroke="#94a3b8"
                     fontSize={9}
+                    domain={[0, 2.5]}
+                    ticks={[0, 0.5, 1.0, 1.5, 2.0, 2.5]}
+                    tickFormatter={(v) => `${v}%`}
                   />
                   <YAxis
                     type="category"
@@ -604,19 +830,36 @@ export const AdminDashboardView: React.FC<AdminDashboardViewProps> = ({
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#191923', fontSize: '11px', borderRadius: '8px' }}
-                    formatter={(val: any) => [Number(val).toLocaleString(), 'Defects']}
+                    formatter={(_val: any, _name: any, item: any) => {
+                      const p = item?.payload;
+                      return [
+                        `${p?.displayRate} (${p?.displayDefects} defects / ${p?.actual_units?.toLocaleString()} units) - ${p?.goodRate}% Good`,
+                        p?.name || p?.machine_id
+                      ];
+                    }}
                   />
                   <Bar
-                    dataKey="defects"
-                    fill="#EF4444"
+                    dataKey="defectRate"
+                    fill="#E11D48"
                     radius={[0, 4, 4, 0]}
-                    label={{ position: 'right', fill: '#64748b', fontSize: 9 }}
+                    label={{
+                      position: 'right',
+                      fill: '#BE123C',
+                      fontSize: 9,
+                      fontWeight: 600,
+                      formatter: (v: any) => `${v}%`
+                    }}
                     onClick={(entry: any) => {
-                      const m = machines.find(x => x.machine_id === entry?.machine_id);
+                      const m = uniqueApexMachines.find(x => (x.machine_id || x.id) === entry?.machine_id);
                       if (m) onSelectMachine(m);
                     }}
                     className="cursor-pointer"
-                  />
+                  >
+                    {machineDefectRates.map((entry, idx) => {
+                      const color = entry.defectRate >= 1.92 ? '#BE123C' : entry.defectRate >= 1.85 ? '#E11D48' : '#FB7185';
+                      return <Cell key={`defect-cell-${idx}`} fill={color} />;
+                    })}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
