@@ -175,7 +175,7 @@ export const ManagerAttendancePage: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 sm:min-w-[240px]">
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-slate-500">Status:</span>
             <select

@@ -20,7 +20,9 @@ import {
   LogOut,
   UserCheck,
   Sparkles,
-  Users
+  Users,
+  ShieldCheck,
+  Package
 } from 'lucide-react';
 
 interface MobileNavDrawerProps {
@@ -54,6 +56,7 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({
         return [
           { path: '/dashboard', label: 'My Dashboard', icon: LayoutDashboard },
           { path: '/attendance', label: 'My Attendance', icon: CalendarCheck },
+          { path: '/inventory', label: 'Spare Parts', icon: Package },
           { path: '/work-orders', label: 'My Work Orders', icon: ClipboardList },
           { path: '/machines', label: 'Assigned Machines', icon: Cpu },
           { path: '/maintenance', label: 'Maintenance', icon: Wrench },
@@ -66,6 +69,7 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({
         return [
           { path: '/dashboard', label: 'Planning Dashboard', icon: LayoutDashboard },
           { path: '/attendance', label: 'My Attendance', icon: CalendarCheck },
+          { path: '/inventory', label: 'Spare Parts', icon: Package },
           { path: '/production', label: 'Production', icon: TrendingUp },
           { path: '/analytics', label: 'Production Analysis', icon: BarChart3 },
           { path: '/machines', label: 'Machine Performance', icon: Cpu },
@@ -78,8 +82,8 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({
       case 'SUPERVISOR':
         return [
           { path: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-          { path: '/team-attendance', label: 'Team Attendance', icon: Users },
-          { path: '/attendance', label: 'My Attendance', icon: CalendarCheck },
+          { path: '/attendance', label: 'Attendance Hub', icon: CalendarCheck },
+          { path: '/inventory', label: 'Spare Parts', icon: Package },
           { path: '/operations', label: 'Operations', icon: Activity },
           { path: '/production', label: 'Production', icon: TrendingUp },
           { path: '/machines', label: 'Machines', icon: Cpu },
@@ -91,9 +95,13 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({
 
       case 'SUPER_ADMIN':
         return [
-          { path: '/super-admin/overview', label: 'Multi-Plant Overview', icon: Activity },
+          { path: '/super-admin/overview', label: 'Executive Overview & Role Monitor', icon: LayoutDashboard },
           { path: '/super-admin/factories', label: 'Factory Management', icon: Building2 },
-          { path: '/dashboard', label: 'Reserved Tenant View', icon: LayoutDashboard }
+          { path: '/super-admin/users', label: 'Tenant Users', icon: Users },
+          { path: '/super-admin/system-health', label: 'System Health & IoT', icon: ShieldCheck },
+          { path: '/super-admin/benchmarking', label: 'Benchmarking Analytics', icon: BarChart3 },
+          { path: '/super-admin/settings', label: 'Settings', icon: Settings },
+          { path: '/dashboard', label: 'Reserved Tenant View', icon: Activity }
         ];
 
       case 'ADMIN':

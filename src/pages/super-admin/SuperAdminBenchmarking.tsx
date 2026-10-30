@@ -230,9 +230,9 @@ export const SuperAdminBenchmarkingPage: React.FC = () => {
           <h2 className="text-sm font-bold text-slate-900">Benchmark Metrics Summary Matrix</h2>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[850px] text-left text-xs">
+            <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                 <th className="py-3 px-4">Plant</th>
                 <th className="py-3 px-4">OEE</th>

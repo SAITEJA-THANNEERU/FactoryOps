@@ -339,7 +339,7 @@ export const GlobalSearch: React.FC<GlobalSearchProps> = ({ onSelectMachine }) =
       </button>
 
       {/* Desktop & Tablet Search Bar (sm and up: 640px+) */}
-      <div ref={containerRef} className="hidden sm:flex flex-1 max-w-xl lg:max-w-2xl min-w-[220px] mx-2 relative">
+      <div ref={containerRef} className="hidden sm:flex flex-1 max-w-xl lg:max-w-2xl min-w-[140px] md:min-w-[180px] lg:min-w-[220px] mx-1 sm:mx-2 relative">
         <div className="w-full relative">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input

@@ -315,9 +315,9 @@ export const InventoryPage: React.FC = () => {
             No spare parts match your filter criteria.
           </div>
         ) : (
-          <div className="overflow-x-auto min-w-[850px]">
+          <div className="w-full overflow-x-auto">
             <div className="overflow-y-auto max-h-[615px] border border-slate-200 rounded-lg relative">
-              <table className="w-full text-left border-collapse text-xs">
+              <table className="w-full min-w-[850px] text-left border-collapse text-xs">
                 {/* Fixed Sticky Header */}
                 <thead className="sticky top-0 z-20 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shadow-xs border-b border-slate-200">
                   <tr>

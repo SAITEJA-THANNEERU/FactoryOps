@@ -111,9 +111,9 @@ export const SuperAdminUsersPage: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white border border-slate-200 rounded-lg p-3.5 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[300px]">
+        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0 sm:min-w-[260px]">
           {/* Search */}
-          <div className="relative w-64">
+          <div className="relative w-full sm:w-64">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -170,9 +170,9 @@ export const SuperAdminUsersPage: React.FC = () => {
 
       {/* Users Table */}
       <div className="bg-white border border-slate-200 rounded-lg shadow-xs overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[750px] text-left text-xs">
+            <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                 <th className="py-3 px-4">User Name</th>
                 <th className="py-3 px-4">Email Address</th>

@@ -91,9 +91,9 @@ export const MaintenancePage: React.FC = () => {
           <span>Maintenance Records & Tasks ({maintenance.length})</span>
           <span className="text-xs font-normal text-slate-500">Persisted in Supabase</span>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[750px] text-left text-xs">
+            <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                 <th className="py-3 px-4">Machine ID</th>
                 <th className="py-3 px-4">Maintenance Type</th>

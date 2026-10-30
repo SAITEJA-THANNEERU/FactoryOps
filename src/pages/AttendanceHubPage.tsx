@@ -341,9 +341,9 @@ export const AttendanceHubPage: React.FC = () => {
               Personal Attendance History Log
             </h3>
 
-            <div className="overflow-x-auto min-w-[700px]">
+            <div className="w-full overflow-x-auto">
               <div className="overflow-y-auto max-h-[615px] border border-slate-200 rounded-lg relative">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full min-w-[650px] text-left border-collapse text-xs">
                   <thead className="sticky top-0 z-10 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-4 bg-slate-100">Date</th>
@@ -509,9 +509,9 @@ export const AttendanceHubPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="overflow-x-auto min-w-[700px]">
+            <div className="w-full overflow-x-auto">
               <div className="overflow-y-auto max-h-[615px] border border-slate-200 rounded-lg relative">
-                <table className="w-full text-left border-collapse text-xs">
+                <table className="w-full min-w-[700px] text-left border-collapse text-xs">
                   <thead className="sticky top-0 z-10 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <tr>
                       <th className="py-2.5 px-4 bg-slate-100">Employee</th>

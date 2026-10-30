@@ -47,9 +47,9 @@ export const QualityPage: React.FC = () => {
 
       <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
         <h2 className="text-sm font-bold text-slate-900 mb-3">Defect Distribution by Machine</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
+        <div className="w-full overflow-x-auto">
+          <table className="w-full min-w-[500px] text-left text-xs">
+            <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                 <th className="py-2.5 px-3">Machine ID</th>
                 <th className="py-2.5 px-3">Shift</th>

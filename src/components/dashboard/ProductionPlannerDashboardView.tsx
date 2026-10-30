@@ -999,9 +999,9 @@ export const ProductionPlannerDashboardView: React.FC<ProductionPlannerDashboard
               </div>
 
               {/* Responsive Scrollable Table Container: Fixed Header, 15 Visible Rows Scrollable Body, Fixed Summary Footer */}
-              <div className="overflow-x-auto min-w-[950px]">
+              <div className="w-full overflow-x-auto">
                 <div className="overflow-y-auto max-h-[615px] relative border-t border-slate-200">
-                  <table className="w-full text-left text-xs text-slate-700 border-collapse">
+                  <table className="w-full min-w-[950px] text-left text-xs text-slate-700 border-collapse">
                     {/* Fixed Sticky Table Header */}
                     <thead className="sticky top-0 z-20 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shadow-xs border-b border-slate-200">
                       <tr>

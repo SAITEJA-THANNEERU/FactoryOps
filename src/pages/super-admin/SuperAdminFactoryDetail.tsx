@@ -303,9 +303,9 @@ export const SuperAdminFactoryDetailPage: React.FC<SuperAdminFactoryDetailPagePr
           <div className="p-4 border-b border-slate-200 font-semibold text-sm text-slate-900">
             Connected Plant Machinery ({machines.length})
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[850px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th className="py-3 px-4">Machine ID</th>
                   <th className="py-3 px-4">Name</th>
@@ -357,9 +357,9 @@ export const SuperAdminFactoryDetailPage: React.FC<SuperAdminFactoryDetailPagePr
           <div className="p-4 border-b border-slate-200 font-semibold text-sm text-slate-900">
             Production Records ({production.length})
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[700px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th className="py-3 px-4">Timestamp</th>
                   <th className="py-3 px-4">Machine ID</th>
@@ -398,9 +398,9 @@ export const SuperAdminFactoryDetailPage: React.FC<SuperAdminFactoryDetailPagePr
           <div className="p-4 border-b border-slate-200 font-semibold text-sm text-slate-900">
             Maintenance History & Scheduled Tasks ({maintenance.length})
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[750px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th className="py-3 px-4">Machine ID</th>
                   <th className="py-3 px-4">Type</th>
@@ -439,9 +439,9 @@ export const SuperAdminFactoryDetailPage: React.FC<SuperAdminFactoryDetailPagePr
           <div className="p-4 border-b border-slate-200 font-semibold text-sm text-slate-900">
             Plant Incident Log ({incidents.length})
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[750px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th className="py-3 px-4">Incident ID</th>
                   <th className="py-3 px-4">Machine ID</th>
@@ -484,9 +484,9 @@ export const SuperAdminFactoryDetailPage: React.FC<SuperAdminFactoryDetailPagePr
           <div className="p-4 border-b border-slate-200 font-semibold text-sm text-slate-900">
             Work Orders Dispatched ({workOrders.length})
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-[750px] text-left text-xs">
+              <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
                 <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
                   <th className="py-3 px-4">WO ID</th>
                   <th className="py-3 px-4">Machine ID</th>
