@@ -270,28 +270,30 @@ export const Header: React.FC = () => {
             />
           </div>
 
-          {/* User Profile Pill & Click Handler */}
-          <div className="flex items-center gap-1 sm:gap-2 pl-1.5 sm:pl-2.5 border-l border-slate-200">
+          {/* User Profile Pill & Actions */}
+          <div className="flex items-center gap-1 sm:gap-2 pl-2 border-l border-slate-200 shrink-0">
             <button
               onClick={() => setIsProfileOpen(true)}
-              className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#0E79B2]/30"
+              className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer text-left focus:outline-hidden focus:ring-2 focus:ring-[#0E79B2]/30 group"
               title="View User Profile & Permissions"
               aria-label="User Profile"
             >
-              <div className="text-right hidden sm:block">
-                <div className="text-xs font-bold text-[#191923] flex items-center justify-end gap-1">
-                  <span className="truncate max-w-[100px] xl:max-w-[140px]">{user?.name}</span>
-                  <UserCheck className="w-3.5 h-3.5 text-[#0E79B2] shrink-0" />
-                </div>
-                <div className="flex items-center justify-end gap-1 mt-0.5">
-                  <span className={`text-[9px] sm:text-[10px] font-semibold border px-1.5 py-0.2 rounded-md ${getRoleBadgeStyle(user?.role)}`}>
-                    {getRoleDisplayName(user?.role)}
-                  </span>
-                </div>
+              {/* Avatar circle (Always visible) */}
+              <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#191923] text-white font-bold text-xs sm:text-sm flex items-center justify-center shadow-xs shrink-0 group-hover:bg-[#0E79B2] transition-colors">
+                {user?.name?.charAt(0) || 'U'}
               </div>
 
-              <div className="w-8 h-8 rounded-full bg-[#191923] text-white font-bold text-xs flex items-center justify-center shadow-2xs shrink-0">
-                {user?.name?.charAt(0) || 'U'}
+              {/* Name (Line 1) and Role Badge (Line 2) */}
+              <div className="flex flex-col min-w-0">
+                <div className="text-xs sm:text-sm font-bold text-[#191923] flex items-center gap-1 leading-tight">
+                  <span className="truncate max-w-[90px] xs:max-w-[130px] sm:max-w-[160px] md:max-w-[200px]">{user?.name}</span>
+                  <UserCheck className="w-3.5 h-3.5 text-[#0E79B2] shrink-0" />
+                </div>
+                <div className="flex items-center mt-0.5">
+                  <span className={`text-[9px] sm:text-[10px] font-semibold border px-1.5 py-0.2 rounded-md leading-none whitespace-nowrap shadow-2xs ${getRoleBadgeStyle(user?.role)}`}>
+                    {getRoleLabel(user?.role)}
+                  </span>
+                </div>
               </div>
             </button>
 
@@ -300,7 +302,7 @@ export const Header: React.FC = () => {
               onClick={logout}
               title="Sign Out"
               aria-label="Sign Out"
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors cursor-pointer shrink-0"
             >
               <LogOut className="w-4 h-4" />
             </button>
