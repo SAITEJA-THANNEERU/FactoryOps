@@ -9,7 +9,21 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { db, verifyPassword, hashPassword, generateSalt, calculateHaversineDistance } from './server/db.ts';
 import { supabaseAdapter, testSupabaseConnection, getActiveDataSource, getDetailedSystemStatus } from './server/supabase.ts';
-import type { User, UserRole, Incident, WorkOrder, Machine, FactoryLocation, AttendanceRecord, AttendanceAuditLog } from './src/types/index.ts';
+import type {
+  User,
+  UserRole,
+  Incident,
+  WorkOrder,
+  Machine,
+  FactoryLocation,
+  AttendanceRecord,
+  AttendanceAuditLog,
+  TechnicianIncidentAssignment,
+  TechnicianProfile,
+  RepairProgressUpdate,
+  IncidentResolutionSubmission,
+  IncidentVerificationDetails
+} from './src/types/index.ts';
 import { GoogleGenAI } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1476,6 +1490,89 @@ app.get('/api/notifications', authenticate, async (req: AuthenticatedRequest, re
       }
     });
 
+    // 4. Technician Incident Assignments
+    const currentUser = req.user;
+    const assignments = db.getTechnicianAssignments({ factory_id: targetFactoryId || 'FAC-001' });
+
+    assignments.forEach(asn => {
+      const isAssignedToCurrentTech = currentUser?.role === 'TECHNICIAN' && (asn.technician_id === currentUser?.id || asn.technician_email === currentUser?.email);
+      const isManagerOrAdmin = currentUser?.role === 'MANAGER_SUPERVISOR' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
+
+      if (isAssignedToCurrentTech) {
+        if (asn.status === 'PENDING ACCEPTANCE') {
+          const id = `asn-action-${asn.id}`;
+          notifications.push({
+            id,
+            type: 'incident',
+            title: `Action Required: New Incident Assigned (${asn.priority})`,
+            description: `${asn.incident_title} on ${asn.machine_name} - Please accept or reject`,
+            timestamp: new Date(asn.assigned_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            severity: asn.priority === 'Critical' ? 'Critical' : 'High',
+            targetPath: '/technician-dashboard',
+            read: db.readNotificationIds.has(id),
+            meta: `Assigned by: ${asn.assigned_by_name} • Due: ${new Date(asn.due_date).toLocaleDateString()}`
+          });
+        }
+        if (asn.is_overdue) {
+          const id = `asn-overdue-${asn.id}`;
+          notifications.push({
+            id,
+            type: 'incident',
+            title: `Overdue Repair: ${asn.incident_title}`,
+            description: `Repair on ${asn.machine_name} exceeded due date (${new Date(asn.due_date).toLocaleDateString()})`,
+            timestamp: 'Overdue',
+            severity: 'Critical',
+            targetPath: '/technician-dashboard',
+            read: db.readNotificationIds.has(id),
+            meta: `Status: ${asn.status} • Progress: ${asn.repair_progress_percent}%`
+          });
+        }
+      }
+
+      if (isManagerOrAdmin) {
+        if (asn.status === 'RESOLVED_PENDING_VERIFICATION') {
+          const id = `asn-verify-${asn.id}`;
+          notifications.push({
+            id,
+            type: 'incident',
+            title: `Verification Required: Repair Completed`,
+            description: `${asn.technician_name} resolved incident on ${asn.machine_name}. Ready for inspection & sign-off.`,
+            timestamp: asn.resolved_at ? new Date(asn.resolved_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending review',
+            severity: 'High',
+            targetPath: '/manager-dashboard',
+            read: db.readNotificationIds.has(id),
+            meta: `Technician: ${asn.technician_name} • Actual hours: ${asn.resolution_submission?.actual_repair_hours || 0}h`
+          });
+        } else if (asn.status === 'REJECTED') {
+          const id = `asn-rej-${asn.id}`;
+          notifications.push({
+            id,
+            type: 'incident',
+            title: `Assignment Rejected by Technician`,
+            description: `${asn.technician_name} rejected incident "${asn.incident_title}". Reason: ${asn.rejection_reason || 'Unavailable'}`,
+            timestamp: new Date(asn.updated_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            severity: 'High',
+            targetPath: '/manager-dashboard',
+            read: db.readNotificationIds.has(id),
+            meta: `Needs Reassignment`
+          });
+        } else if (asn.status === 'REASSIGNMENT_REQUESTED') {
+          const id = `asn-reasgn-${asn.id}`;
+          notifications.push({
+            id,
+            type: 'incident',
+            title: `Reassignment Requested`,
+            description: `${asn.technician_name} requested reassignment for "${asn.incident_title}": ${asn.reassignment_reason}`,
+            timestamp: new Date(asn.updated_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            severity: 'Medium',
+            targetPath: '/manager-dashboard',
+            read: db.readNotificationIds.has(id),
+            meta: `Review request in Manager Dashboard`
+          });
+        }
+      }
+    });
+
     const unreadCount = notifications.filter(n => !n.read).length;
     res.json({
       notifications,
@@ -1896,6 +1993,647 @@ app.post('/api/machines/thresholds', authenticate, authorizeRole('ADMIN', 'SUPER
     res.json({ success: true, machine });
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to set machine thresholds' });
+  }
+});
+
+// ==========================================
+// TECHNICIAN MANAGEMENT & RESOLUTION ROUTES
+// ==========================================
+
+// GET /api/technicians - List technician profiles
+app.get('/api/technicians', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const factoryId = getResolvedFactoryId(req) || 'FAC-001';
+    const profiles = await supabaseAdapter.getTechnicianProfiles(factoryId);
+    res.json(profiles);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch technician profiles' });
+  }
+});
+
+// GET /api/technician-assignments - List assignments with strict role-based access
+app.get('/api/technician-assignments', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const factoryId = getResolvedFactoryId(req) || 'FAC-001';
+    const user = req.user!;
+    const status = (req.query.status as string) || 'ALL';
+
+    let assignments: TechnicianIncidentAssignment[] = [];
+
+    if (user.role === 'TECHNICIAN') {
+      // Find matching technician profile IDs
+      const allProfiles = await supabaseAdapter.getTechnicianProfiles(factoryId);
+      const myProfile = allProfiles.find(
+        p => p.user_id === user.id || p.email?.toLowerCase() === user.email?.toLowerCase() || p.id === user.id
+      );
+      const possibleIds = Array.from(new Set([user.id, myProfile?.id, myProfile?.user_id].filter(Boolean))) as string[];
+
+      assignments = await supabaseAdapter.getTechnicianAssignments({
+        factory_id: factoryId,
+        technician_ids: possibleIds,
+        email: user.email,
+        status: status === 'ALL' ? undefined : status
+      });
+    } else if (user.role === 'PRODUCTION_PLANNER') {
+      // Production Planners see operational schedules and machine downtime impact,
+      // but sensitive internal technician rejections / private notes are redacted
+      const all = await supabaseAdapter.getTechnicianAssignments({
+        factory_id: factoryId,
+        status: status === 'ALL' ? undefined : status
+      });
+      assignments = all.map(a => ({
+        ...a,
+        rejection_reason: a.rejection_reason ? '[Confidential Rejection Filed]' : undefined,
+        reassignment_reason: a.reassignment_reason ? '[Reassignment Pending Review]' : undefined
+      }));
+    } else {
+      // Manager/Supervisor, Admin, Super Admin have full management visibility
+      assignments = await supabaseAdapter.getTechnicianAssignments({
+        factory_id: factoryId,
+        status: status === 'ALL' ? undefined : status
+      });
+    }
+
+    res.json(assignments);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to fetch technician assignments' });
+  }
+});
+
+// POST /api/technician-assignments/recommend - AI Technician Recommendation
+app.post('/api/technician-assignments/recommend', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { incident_id } = req.body;
+    if (!incident_id) {
+      res.status(400).json({ error: 'incident_id is required' });
+      return;
+    }
+
+    const recommendation = await supabaseAdapter.recommendTechnicianForIncident(incident_id);
+    res.json(recommendation);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to generate technician recommendation' });
+  }
+});
+
+// POST /api/technician-assignments - Manager assigns incident to technician
+app.post('/api/technician-assignments', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const {
+      incident_id,
+      technician_id,
+      priority,
+      due_date,
+      identified_issue,
+      root_cause_analysis,
+      recommended_resolution,
+      required_tools,
+      spare_parts_required,
+      estimated_repair_hours,
+      ai_recommendation_details
+    } = req.body;
+
+    if (!incident_id || !technician_id) {
+      res.status(400).json({ error: 'incident_id and technician_id are required' });
+      return;
+    }
+
+    const incident = db.incidents.find(i => i.id === incident_id || i.incident_id === incident_id);
+    const profiles = await supabaseAdapter.getTechnicianProfiles('FAC-001');
+    const tech = profiles.find(p => p.user_id === technician_id || p.id === technician_id || p.email === technician_id);
+    const machine = incident ? db.machines.find(m => m.id === incident.machine_id) : undefined;
+
+    const assignment = await supabaseAdapter.createTechnicianAssignment({
+      incident_id,
+      incident_title: incident?.title || req.body.incident_title || 'Equipment Breakdown',
+      incident_description: incident?.description || '',
+      machine_id: incident?.machine_id || 'M001',
+      machine_name: machine?.name || 'Factory Asset',
+      machine_code: machine?.machine_id,
+      machine_location: machine?.line,
+      factory_id: 'FAC-001',
+      factory_name: 'Apex Precision Manufacturing',
+      technician_id: tech?.user_id || technician_id,
+      technician_name: tech?.name || 'Assigned Technician',
+      technician_email: tech?.email,
+      technician_specialisation: tech?.specialisation || 'Mechanical Technician',
+      priority: priority || incident?.severity || 'High',
+      due_date: due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
+      assigned_by_id: user.id,
+      assigned_by_name: user.name,
+      assigned_by_role: user.role,
+      identified_issue: identified_issue || incident?.title,
+      root_cause_analysis,
+      recommended_resolution,
+      required_tools: required_tools || [],
+      spare_parts_required: spare_parts_required || [],
+      estimated_repair_hours: estimated_repair_hours || 2.5,
+      ai_recommendation_details
+    });
+
+    await logAuditEvent(
+      req,
+      'ASSIGN_TECHNICIAN',
+      'IncidentAssignment',
+      assignment.id,
+      `Assigned incident ${incident_id} to ${assignment.technician_name} (${assignment.technician_specialisation})`
+    );
+
+    res.status(201).json(assignment);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to create technician assignment' });
+  }
+});
+
+// POST /api/technician-assignments/:id/accept - Technician accepts assignment
+app.post('/api/technician-assignments/:id/accept', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only accept your own assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'ACCEPTED',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: req.body.notes || 'Technician accepted assignment and scheduled work'
+    });
+
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      status: 'ACCEPTED',
+      accepted_at: nowIso,
+      history
+    });
+
+    await logAuditEvent(req, 'ACCEPT_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} accepted assignment ${req.params.id}`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to accept assignment' });
+  }
+});
+
+// POST /api/technician-assignments/:id/reject - Technician rejects assignment with reason
+app.post('/api/technician-assignments/:id/reject', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { rejection_reason } = req.body;
+    if (!rejection_reason || !rejection_reason.trim()) {
+      res.status(400).json({ error: 'rejection_reason is required' });
+      return;
+    }
+
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only reject your own assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'REJECTED',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: `Rejected by technician: ${rejection_reason}`
+    });
+
+    // Rejection routes to PENDING REASSIGNMENT / REASSIGNMENT_REQUESTED for Manager intervention
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      status: 'REASSIGNMENT_REQUESTED',
+      rejection_reason,
+      reassignment_reason: `Technician Rejected: ${rejection_reason}`,
+      history
+    });
+
+    await logAuditEvent(req, 'REJECT_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} rejected assignment ${req.params.id}. Reason: ${rejection_reason}`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to reject assignment' });
+  }
+});
+
+// POST /api/technician-assignments/:id/request-reassignment - Technician requests reassignment with reason
+app.post('/api/technician-assignments/:id/request-reassignment', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { reassignment_reason } = req.body;
+    if (!reassignment_reason || !reassignment_reason.trim()) {
+      res.status(400).json({ error: 'reassignment_reason is required' });
+      return;
+    }
+
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only request reassignment for your own assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'REQUESTED_REASSIGNMENT',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: `Reassignment requested: ${reassignment_reason}`
+    });
+
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      status: 'REASSIGNMENT_REQUESTED',
+      reassignment_reason,
+      history
+    });
+
+    await logAuditEvent(req, 'REQUEST_REASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} requested reassignment: ${reassignment_reason}`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to request reassignment' });
+  }
+});
+
+// POST /api/technician-assignments/:id/review-reassignment - Manager approves or rejects reassignment
+app.post('/api/technician-assignments/:id/review-reassignment', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { decision, new_technician_id, manager_notes } = req.body; // 'APPROVE' or 'REJECT'
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+
+    if (decision === 'APPROVE') {
+      const profiles = await supabaseAdapter.getTechnicianProfiles('FAC-001');
+      const newTech = new_technician_id ? profiles.find(p => p.user_id === new_technician_id || p.id === new_technician_id) : undefined;
+      
+      history.push({
+        timestamp: nowIso,
+        action: 'REASSIGNMENT_APPROVED',
+        performed_by_id: user.id,
+        performed_by_name: user.name,
+        performed_by_role: user.role,
+        notes: `Reassignment approved by manager. ${newTech ? `Reassigned to ${newTech.name}.` : ''} Notes: ${manager_notes || 'None'}`
+      });
+
+      const updates: Partial<TechnicianIncidentAssignment> = {
+        status: newTech ? 'PENDING ACCEPTANCE' : 'REASSIGNMENT_APPROVED',
+        history
+      };
+
+      if (newTech) {
+        updates.technician_id = newTech.user_id;
+        updates.technician_name = newTech.name;
+        updates.technician_email = newTech.email;
+        updates.technician_specialisation = newTech.specialisation;
+      }
+
+      const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, updates);
+      await logAuditEvent(req, 'APPROVE_REASSIGNMENT', 'IncidentAssignment', req.params.id, `Manager ${user.name} approved reassignment for ${req.params.id}`);
+      res.json(updated);
+    } else {
+      history.push({
+        timestamp: nowIso,
+        action: 'REASSIGNMENT_REJECTED',
+        performed_by_id: user.id,
+        performed_by_name: user.name,
+        performed_by_role: user.role,
+        notes: `Reassignment declined by manager: ${manager_notes || 'Technician must retain assignment.'}`
+      });
+
+      const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+        status: 'ACCEPTED',
+        history
+      });
+      await logAuditEvent(req, 'REJECT_REASSIGNMENT', 'IncidentAssignment', req.params.id, `Manager ${user.name} declined reassignment request for ${req.params.id}`);
+      res.json(updated);
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to review reassignment' });
+  }
+});
+
+// POST /api/technician-assignments/:id/start-repair - Technician begins repair
+app.post('/api/technician-assignments/:id/start-repair', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only start your own repair assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'STARTED_REPAIR',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: req.body.notes || 'Repair initiated on machine with LOTO verified'
+    });
+
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      status: 'IN PROGRESS',
+      repair_started_at: nowIso,
+      repair_progress_percent: Math.max(10, assignment.repair_progress_percent || 0),
+      history
+    });
+
+    await logAuditEvent(req, 'START_REPAIR', 'IncidentAssignment', req.params.id, `Technician ${user.name} started repair on ${assignment.machine_name}`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to start repair' });
+  }
+});
+
+// POST /api/technician-assignments/:id/progress-update - Log repair diagnosis and %
+app.post('/api/technician-assignments/:id/progress-update', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { progress_percent, diagnosis_notes, additional_problems_found } = req.body;
+    if (progress_percent === undefined || !diagnosis_notes) {
+      res.status(400).json({ error: 'progress_percent and diagnosis_notes are required' });
+      return;
+    }
+
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only update progress on your own assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const newUpdate: RepairProgressUpdate = {
+      id: `UPD-${Date.now().toString().slice(-5)}`,
+      timestamp: nowIso,
+      progress_percent: Number(progress_percent),
+      diagnosis_notes,
+      additional_problems_found,
+      updated_by_id: user.id,
+      updated_by_name: user.name
+    };
+
+    const updates = [...(assignment.progress_updates || []), newUpdate];
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'PROGRESS_UPDATE',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: `Progress logged: ${progress_percent}%. Notes: ${diagnosis_notes}`
+    });
+
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      repair_progress_percent: Number(progress_percent),
+      repair_notes: diagnosis_notes,
+      progress_updates: updates,
+      history
+    });
+
+    await logAuditEvent(req, 'UPDATE_REPAIR_PROGRESS', 'IncidentAssignment', req.params.id, `Repair progress on ${assignment.machine_name}: ${progress_percent}%`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to record progress update' });
+  }
+});
+
+// POST /api/technician-assignments/:id/resolve - Technician submits completed repair for verification
+app.post('/api/technician-assignments/:id/resolve', authenticate, authorizeRole('TECHNICIAN', 'ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const {
+      confirmed_root_cause,
+      actions_taken,
+      parts_used,
+      actual_repair_hours,
+      resolution_remarks
+    } = req.body;
+
+    if (!confirmed_root_cause || !actions_taken || actual_repair_hours === undefined) {
+      res.status(400).json({ error: 'confirmed_root_cause, actions_taken, and actual_repair_hours are required' });
+      return;
+    }
+
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const isAuthorized =
+      user.role === 'ADMIN' ||
+      user.role === 'SUPER_ADMIN' ||
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (!isAuthorized) {
+      res.status(403).json({ error: 'Forbidden: You can only resolve your own assignments' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const resolution_submission: IncidentResolutionSubmission = {
+      confirmed_root_cause,
+      actions_taken,
+      parts_used: parts_used || [],
+      actual_repair_hours: Number(actual_repair_hours),
+      resolution_remarks: resolution_remarks || '',
+      submitted_at: nowIso
+    };
+
+    const history = [...(assignment.history || [])];
+    history.push({
+      timestamp: nowIso,
+      action: 'MARKED_RESOLVED',
+      performed_by_id: user.id,
+      performed_by_name: user.name,
+      performed_by_role: user.role,
+      notes: `Repair finished in ${actual_repair_hours}h and submitted for Manager verification.`
+    });
+
+    const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+      status: 'RESOLVED_PENDING_VERIFICATION',
+      resolved_at: nowIso,
+      repair_progress_percent: 100,
+      resolution_submission,
+      history
+    });
+
+    await logAuditEvent(req, 'RESOLVE_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} submitted repair resolution for ${assignment.machine_name} (${actual_repair_hours} hrs)`);
+    res.json(updated);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to submit resolution' });
+  }
+});
+
+// POST /api/technician-assignments/:id/verify - Manager verifies resolution
+app.post('/api/technician-assignments/:id/verify', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { decision, verification_notes, quality_rating, rework_instructions } = req.body; // 'APPROVE' or 'REJECT'
+    const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
+    if (!assignment) {
+      res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    const nowIso = new Date().toISOString();
+    const history = [...(assignment.history || [])];
+
+    if (decision === 'APPROVE') {
+      const verification_details: IncidentVerificationDetails = {
+        verified_by_id: user.id,
+        verified_by_name: user.name,
+        verified_by_role: user.role,
+        verified_at: nowIso,
+        verification_notes: verification_notes || 'Repair verified and approved according to SOP standards.',
+        quality_rating: Number(quality_rating || 5)
+      };
+
+      history.push({
+        timestamp: nowIso,
+        action: 'VERIFIED',
+        performed_by_id: user.id,
+        performed_by_name: user.name,
+        performed_by_role: user.role,
+        notes: `Repair verified and approved by ${user.name}. Quality Rating: ${quality_rating || 5}/5`
+      });
+
+      history.push({
+        timestamp: nowIso,
+        action: 'CLOSED',
+        performed_by_id: user.id,
+        performed_by_name: user.name,
+        performed_by_role: user.role,
+        notes: 'Incident lifecycle closed.'
+      });
+
+      const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+        status: 'VERIFIED',
+        verified_at: nowIso,
+        verification_details,
+        history
+      });
+
+      await logAuditEvent(req, 'VERIFY_RESOLUTION', 'IncidentAssignment', req.params.id, `Manager ${user.name} approved resolution for assignment ${req.params.id}`);
+      res.json(updated);
+    } else {
+      // Rejection: return to IN PROGRESS for rework
+      history.push({
+        timestamp: nowIso,
+        action: 'REOPENED_FOR_REWORK',
+        performed_by_id: user.id,
+        performed_by_name: user.name,
+        performed_by_role: user.role,
+        notes: `Resolution rejected by manager. Rework required: ${rework_instructions || verification_notes || 'Review root cause and re-test.'}`
+      });
+
+      const updated = await supabaseAdapter.updateTechnicianAssignment(req.params.id, {
+        status: 'IN PROGRESS',
+        repair_progress_percent: 75,
+        history
+      });
+
+      await logAuditEvent(req, 'REJECT_RESOLUTION', 'IncidentAssignment', req.params.id, `Manager ${user.name} rejected resolution for ${req.params.id}, requesting rework`);
+      res.json(updated);
+    }
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to verify assignment' });
   }
 });
 

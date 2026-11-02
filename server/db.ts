@@ -17,7 +17,9 @@ import type {
   AttendanceRecord,
   AttendanceAuditLog,
   SparePart,
-  SystemAuditLog
+  SystemAuditLog,
+  TechnicianProfile,
+  TechnicianIncidentAssignment
 } from '../src/types/index.ts';
 
 // Haversine distance calculator (returns distance in meters between two lat/lon points)
@@ -74,6 +76,8 @@ class FactoryOpsDatabase {
   public attendanceAuditLogs: AttendanceAuditLog[] = [];
   public spareParts: SparePart[] = [];
   public systemAuditLogs: SystemAuditLog[] = [];
+  public technicianProfiles: TechnicianProfile[] = [];
+  public technicianAssignments: TechnicianIncidentAssignment[] = [];
   public readNotificationIds: Set<string> = new Set();
   public sessions: Map<string, { userId: string; role: string; factoryId: string | null; expiresAt: number }> = new Map();
 
@@ -106,7 +110,9 @@ class FactoryOpsDatabase {
         attendanceRecords: this.attendanceRecords,
         attendanceAuditLogs: this.attendanceAuditLogs,
         spareParts: this.spareParts,
-        systemAuditLogs: this.systemAuditLogs
+        systemAuditLogs: this.systemAuditLogs,
+        technicianProfiles: this.technicianProfiles,
+        technicianAssignments: this.technicianAssignments
       };
       fs.writeFileSync(this.persistentFile, JSON.stringify(state, null, 2), 'utf8');
     } catch (err: any) {
@@ -161,9 +167,28 @@ class FactoryOpsDatabase {
           this.spareParts = (state.spareParts || []).filter((p: any) => !p.factory_id || p.factory_id === 'FAC-001');
           this.attendanceAuditLogs = state.attendanceAuditLogs || [];
           this.systemAuditLogs = (state.systemAuditLogs || []).filter((s: any) => !s.factory_id || s.factory_id === 'FAC-001');
+          this.technicianProfiles = (state.technicianProfiles || []).filter((p: any) => !p.factory_id || p.factory_id === 'FAC-001');
+          this.technicianAssignments = (state.technicianAssignments || []).filter((a: any) => !a.factory_id || a.factory_id === 'FAC-001');
+
+          this.ensureTechnicianUsers();
 
           if (this.spareParts.length === 0) {
             this.seedSpareParts();
+          }
+
+          this.seedTechnicianProfiles();
+          this.seedTechnicianAssignments();
+
+          // Merge any saved assignments from state over the seed assignments
+          if (Array.isArray(state.technicianAssignments) && state.technicianAssignments.length > 0) {
+            for (const savedAsn of state.technicianAssignments) {
+              const idx = this.technicianAssignments.findIndex(a => a.id === savedAsn.id);
+              if (idx !== -1) {
+                this.technicianAssignments[idx] = { ...this.technicianAssignments[idx], ...savedAsn };
+              } else {
+                this.technicianAssignments.push(savedAsn);
+              }
+            }
           }
 
           const todayStr = '2026-10-30';
@@ -268,6 +293,9 @@ class FactoryOpsDatabase {
     seedUser('USR-012', 'Ramesh Varma (Senior Technician)', 'tech.apex@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
     seedUser('USR-013', 'Anil Sharma (Technician)', 'tech.nova@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
     seedUser('USR-014', 'Praveen Nair (Technician)', 'tech.vertex@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
+    seedUser('USR-018', 'Vikram Singh (Automation & Robotics Tech)', 'tech.robotics@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
+    seedUser('USR-019', 'Rajesh Menon (Hydraulics & Pneumatics Tech)', 'tech.hydraulics@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
+    seedUser('USR-020', 'Sunita Rao (Instrumentation & Controls Tech)', 'tech.instruments@factoryops.com', 'Tech@123', 'TECHNICIAN', 'FAC-001');
 
     // 5. Production Planners (Primary Role - Associated with Apex)
     seedUser('USR-015', 'Priya Sundaram (Production Planner)', 'planner.apex@factoryops.com', 'Planner@123', 'PRODUCTION_PLANNER', 'FAC-001');
@@ -278,6 +306,8 @@ class FactoryOpsDatabase {
     this.loadCleanedDatasetsForApex(); // Apex (FAC-001) - 24 Cleaned Machines, 6,480 Production Runs, 210 Maintenance, 109 Incidents, 129 Work Orders
     this.seedAttendanceData();
     this.seedSpareParts();
+    this.seedTechnicianProfiles();
+    this.seedTechnicianAssignments();
   }
 
   // --- SEED SPARE PARTS INVENTORY ---
@@ -2129,6 +2159,919 @@ class FactoryOpsDatabase {
 
   public getDataQualityForFactory(factoryId: string): DataQualityMetric[] {
     return this.dataQuality.filter(d => d.factory_id === factoryId);
+  }
+
+  // --- TECHNICIAN MANAGEMENT & RESOLUTION METHODS ---
+  public ensureTechnicianUsers() {
+    const techUsersToEnsure = [
+      {
+        id: 'USR-018',
+        name: 'Vikram Singh (Automation & Robotics Tech)',
+        email: 'tech.robotics@factoryops.com',
+        role: 'TECHNICIAN' as const,
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing'
+      },
+      {
+        id: 'USR-019',
+        name: 'Rajesh Menon (Hydraulics & Pneumatics Tech)',
+        email: 'tech.hydraulics@factoryops.com',
+        role: 'TECHNICIAN' as const,
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing'
+      },
+      {
+        id: 'USR-020',
+        name: 'Sunita Rao (Instrumentation & Controls Tech)',
+        email: 'tech.instruments@factoryops.com',
+        role: 'TECHNICIAN' as const,
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing'
+      }
+    ];
+
+    for (const u of techUsersToEnsure) {
+      if (!this.users.some(existing => existing.id === u.id || existing.email === u.email)) {
+        const salt = generateSalt();
+        const hash = hashPassword('Tech@123', salt);
+        this.users.push({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          password_hash: hash,
+          salt,
+          role: u.role,
+          factory_id: u.factory_id,
+          factory_name: u.factory_name,
+          status: 'active',
+          created_at: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  public seedTechnicianProfiles() {
+    this.technicianProfiles = [
+      {
+        id: 'TECH-001',
+        user_id: 'USR-012',
+        name: 'Ramesh Varma',
+        email: 'tech.apex@factoryops.com',
+        specialisation: 'Mechanical Technician',
+        secondary_specialisations: ['CNC Technician'],
+        technical_skills: [
+          'Spindle Alignment',
+          'Bearing Replacement',
+          'Vibration Analysis',
+          'Gearbox Overhaul',
+          'Precision Machining',
+          'Dial Indicator Calibration'
+        ],
+        experience_years: 9,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'AVAILABLE',
+        current_workload: 1,
+        active_assignments_count: 1,
+        max_concurrent_assignments: 3,
+        certifications: ['ISO 18436 Vibration Cat II', 'SKF Certified Maintenance Specialist'],
+        shift: 'Morning (06:00 - 14:00)',
+        phone: '+91 98490 12012',
+        rating: 4.9,
+        completed_repairs_count: 87,
+        created_at: '2024-01-10T08:00:00Z',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'TECH-002',
+        user_id: 'USR-013',
+        name: 'Anil Sharma',
+        email: 'tech.nova@factoryops.com',
+        specialisation: 'Electrical Technician',
+        secondary_specialisations: ['Instrumentation Technician'],
+        technical_skills: [
+          'PLC Diagnostics',
+          'VFD Configuration',
+          'Control Panel Wiring',
+          'Thermal Imaging',
+          'Power Distribution 415V',
+          'Relay Logic'
+        ],
+        experience_years: 7,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'AVAILABLE',
+        current_workload: 1,
+        active_assignments_count: 1,
+        max_concurrent_assignments: 3,
+        certifications: ['Certified Electrical Safety Worker (NFPA 70E)', 'Siemens S7-1200 Certified'],
+        shift: 'General (09:00 - 17:30)',
+        phone: '+91 98490 12013',
+        rating: 4.8,
+        completed_repairs_count: 64,
+        created_at: '2024-02-15T08:00:00Z',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'TECH-003',
+        user_id: 'USR-014',
+        name: 'Praveen Nair',
+        email: 'tech.vertex@factoryops.com',
+        specialisation: 'CNC Technician',
+        secondary_specialisations: ['Mechanical Technician'],
+        technical_skills: [
+          'Fanuc 31i Diagnostics',
+          'Ballscrew Backlash Calibration',
+          'Tool Changer Alignment',
+          'G-Code Optimization',
+          'Linear Guide Rail Replacement'
+        ],
+        experience_years: 6,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'BUSY',
+        current_workload: 2,
+        active_assignments_count: 2,
+        max_concurrent_assignments: 2,
+        certifications: ['Fanuc Certified Maintenance Specialist', 'Heidenhain Linear Encoders'],
+        shift: 'Afternoon (14:00 - 22:00)',
+        phone: '+91 98490 12014',
+        rating: 4.7,
+        completed_repairs_count: 53,
+        created_at: '2024-03-01T08:00:00Z',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'TECH-004',
+        user_id: 'USR-018',
+        name: 'Vikram Singh',
+        email: 'tech.robotics@factoryops.com',
+        specialisation: 'Automation & Robotics Technician',
+        secondary_specialisations: ['Electrical Technician'],
+        technical_skills: [
+          'KUKA KRC4 Programming',
+          'ABB IRC5 Calibration',
+          'EOAT Pneumatics',
+          'Safety Interlock Wiring',
+          'Servo Drive Tuning',
+          'Industrial Ethernet'
+        ],
+        experience_years: 8,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'AVAILABLE',
+        current_workload: 1,
+        active_assignments_count: 1,
+        max_concurrent_assignments: 3,
+        certifications: ['KUKA System Integrator Certified', 'FANUC Robotics Core Operations'],
+        shift: 'Morning (06:00 - 14:00)',
+        phone: '+91 98490 12018',
+        rating: 4.9,
+        completed_repairs_count: 72,
+        created_at: '2024-04-10T08:00:00Z',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'TECH-005',
+        user_id: 'USR-019',
+        name: 'Rajesh Menon',
+        email: 'tech.hydraulics@factoryops.com',
+        specialisation: 'Hydraulic & Pneumatic Technician',
+        secondary_specialisations: ['Mechanical Technician'],
+        technical_skills: [
+          'Proportional Valve Calibration',
+          'Accumulator Charging',
+          'High-Pressure Hose Crimp',
+          'Pneumatic Manifold Troubleshooting',
+          'Oil Contamination Testing',
+          'Hydrostatic Pressure Testing'
+        ],
+        experience_years: 11,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'AVAILABLE',
+        current_workload: 1,
+        active_assignments_count: 1,
+        max_concurrent_assignments: 3,
+        certifications: ['IFPS Certified Hydraulic Specialist', 'Parker Fluid Power Cert'],
+        shift: 'General (09:00 - 17:30)',
+        phone: '+91 98490 12019',
+        rating: 4.95,
+        completed_repairs_count: 115,
+        created_at: '2024-01-05T08:00:00Z',
+        updated_at: new Date().toISOString()
+      },
+      {
+        id: 'TECH-006',
+        user_id: 'USR-020',
+        name: 'Sunita Rao',
+        email: 'tech.instruments@factoryops.com',
+        specialisation: 'Instrumentation Technician',
+        secondary_specialisations: ['Electrical Technician'],
+        technical_skills: [
+          '4-20mA Loop Calibration',
+          'RTD & Thermocouple Verification',
+          'Flowmeter Tuning',
+          'SCADA I/O Mapping',
+          'Pressure Transmitter Calibration',
+          'PID Loop Tuning'
+        ],
+        experience_years: 5,
+        assigned_factory_id: 'FAC-001',
+        assigned_factory_name: 'Apex Precision Manufacturing',
+        availability_status: 'AVAILABLE',
+        current_workload: 0,
+        active_assignments_count: 0,
+        max_concurrent_assignments: 3,
+        certifications: ['ISA Certified Control Systems Technician (CCST)', 'Yokogawa Instrumentation'],
+        shift: 'General (09:00 - 17:30)',
+        phone: '+91 98490 12020',
+        rating: 4.85,
+        completed_repairs_count: 48,
+        created_at: '2024-05-12T08:00:00Z',
+        updated_at: new Date().toISOString()
+      }
+    ];
+  }
+
+  public seedTechnicianAssignments() {
+    this.technicianAssignments = [
+      {
+        id: 'ASN-2026-001',
+        incident_id: 'INC-0001',
+        incident_title: 'Spindle Bearing Thermal Runaway & Excessive Vibration',
+        incident_description: 'High frequency harmonic chatter and 4.8 mm/s RMS vibration detected on CNC Milling spindle axis.',
+        machine_id: 'M001',
+        machine_name: 'Apex 5-Axis CNC Machining Center 01',
+        machine_code: 'APX-CNC-01',
+        machine_location: 'Bay 1 - Heavy Machining',
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing',
+        technician_id: 'USR-012',
+        technician_name: 'Ramesh Varma',
+        technician_email: 'tech.apex@factoryops.com',
+        technician_specialisation: 'Mechanical Technician',
+        status: 'IN PROGRESS',
+        priority: 'High',
+        assigned_date: '2026-10-30T09:00:00Z',
+        due_date: '2026-11-01T18:00:00Z',
+        is_overdue: false,
+        assigned_by_id: 'USR-007',
+        assigned_by_name: 'Amit Deshmukh (Manager/Supervisor)',
+        assigned_by_role: 'MANAGER_SUPERVISOR',
+        accepted_at: '2026-10-30T09:18:22Z',
+        repair_started_at: '2026-10-30T10:15:00Z',
+        repair_progress_percent: 50,
+        repair_notes: 'Initial inspection confirmed cage wear on rear tandem bearing. Spindle disassembled and cleaned.',
+        identified_issue: 'Excessive spindle bearing vibration and temperature rising above 78°C',
+        root_cause_analysis: 'High radial preload caused thermal breakdown of lubricant and micro-spalling on inner race',
+        recommended_resolution: 'Extract ceramic hybrid bearing set SKF-7014, check shaft runout, re-seat with precision spacer',
+        required_tools: ['Spindle Puller Set', 'Dial Test Indicator (0.001mm)', 'Torque Wrench 40Nm', 'Bearing Induction Heater'],
+        spare_parts_required: [
+          {
+            part_id: 'PRT-1001',
+            part_number: 'SKF-7014-ACD',
+            part_name: 'Spindle High-Precision Ceramic Bearing',
+            quantity: 2,
+            is_in_stock: true,
+            status: 'Reserved'
+          }
+        ],
+        estimated_repair_hours: 3.5,
+        ai_recommendation_details: {
+          match_score: 96,
+          reasoning: 'Ramesh Varma has 9 years of mechanical experience, ISO vibration certification, and direct spindle bearing expertise.',
+          required_specialisation: 'Mechanical Technician',
+          matched_skills: ['Spindle Alignment', 'Bearing Replacement', 'Vibration Analysis']
+        },
+        progress_updates: [
+          {
+            id: 'UPD-001',
+            timestamp: '2026-10-30T10:30:00Z',
+            progress_percent: 25,
+            diagnosis_notes: 'Spindle casing opened. Confirmed bearing race scoring.',
+            additional_problems_found: 'Minor lubrication line buildup cleared with solvent flush.',
+            updated_by_id: 'USR-012',
+            updated_by_name: 'Ramesh Varma'
+          },
+          {
+            id: 'UPD-002',
+            timestamp: '2026-10-30T13:45:00Z',
+            progress_percent: 50,
+            diagnosis_notes: 'Defective bearing extracted cleanly without shaft scoring. Preparing new bearing install.',
+            updated_by_id: 'USR-012',
+            updated_by_name: 'Ramesh Varma'
+          }
+        ],
+        history: [
+          {
+            timestamp: '2026-10-30T09:00:00Z',
+            action: 'ASSIGNED',
+            performed_by_id: 'USR-007',
+            performed_by_name: 'Amit Deshmukh',
+            performed_by_role: 'MANAGER_SUPERVISOR',
+            notes: 'AI recommendation approved by manager Amit Deshmukh.'
+          },
+          {
+            timestamp: '2026-10-30T09:18:22Z',
+            action: 'ACCEPTED',
+            performed_by_id: 'USR-012',
+            performed_by_name: 'Ramesh Varma',
+            performed_by_role: 'TECHNICIAN',
+            notes: 'Technician accepted assignment and scheduled bay arrival.'
+          },
+          {
+            timestamp: '2026-10-30T10:15:00Z',
+            action: 'STARTED_REPAIR',
+            performed_by_id: 'USR-012',
+            performed_by_name: 'Ramesh Varma',
+            performed_by_role: 'TECHNICIAN',
+            notes: 'LOTO applied and repair initiated.'
+          }
+        ],
+        created_at: '2026-10-30T09:00:00Z',
+        updated_at: '2026-10-30T13:45:00Z'
+      },
+      {
+        id: 'ASN-2026-002',
+        incident_id: 'INC-0073',
+        incident_title: 'Seal Micro-Extrusion & Hydraulic Tonnage Loss',
+        incident_description: 'Hydraulic ram cylinder oil weeping and pressure decay from 220 bar to 165 bar during full stroke clamping.',
+        machine_id: 'M007',
+        machine_name: 'Hydraulic Stamping Press 01',
+        machine_code: 'APX-PRS-01',
+        machine_location: 'Bay 3 - Stamping & Forming',
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing',
+        technician_id: 'USR-019',
+        technician_name: 'Rajesh Menon',
+        technician_email: 'tech.hydraulics@factoryops.com',
+        technician_specialisation: 'Hydraulic & Pneumatic Technician',
+        status: 'RESOLVED_PENDING_VERIFICATION',
+        priority: 'High',
+        assigned_date: '2026-10-29T10:00:00Z',
+        due_date: '2026-10-30T18:00:00Z',
+        is_overdue: false,
+        assigned_by_id: 'USR-007',
+        assigned_by_name: 'Amit Deshmukh (Manager/Supervisor)',
+        assigned_by_role: 'MANAGER_SUPERVISOR',
+        accepted_at: '2026-10-29T10:12:00Z',
+        repair_started_at: '2026-10-29T11:00:00Z',
+        resolved_at: '2026-10-30T15:30:00Z',
+        repair_progress_percent: 100,
+        identified_issue: 'Hydraulic ram oil seal degradation and pressure droop during 120-ton cycle',
+        root_cause_analysis: 'Thermal fatigue of primary polyurethane chevron seal due to contaminated fluid particulate spike',
+        recommended_resolution: 'Depressurize accumulator, replace valve block seal kit VTN-OR-K50, filter fluid, bleed air',
+        required_tools: ['Hydraulic Pressure Gauge Kit (0-400 Bar)', 'Spanner Set 32mm', 'Fluid Bleed Hose'],
+        spare_parts_required: [
+          {
+            part_id: 'PRT-1002',
+            part_number: 'VTN-OR-K50',
+            part_name: 'Hydraulic Valve Block Viton O-Ring Seal Kit',
+            quantity: 1,
+            is_in_stock: true,
+            status: 'Used'
+          }
+        ],
+        estimated_repair_hours: 4.0,
+        ai_recommendation_details: {
+          match_score: 98,
+          reasoning: 'Rajesh Menon has 11 years experience as IFPS certified fluid power specialist, perfect match for high pressure hydraulics.',
+          required_specialisation: 'Hydraulic & Pneumatic Technician',
+          matched_skills: ['Proportional Valve Calibration', 'High-Pressure Hose Crimp', 'Pneumatic Manifold Troubleshooting']
+        },
+        resolution_submission: {
+          confirmed_root_cause: 'Particulate contamination caused abrasion and micro-extrusion of main ram cylinder wiper seal and valve block O-ring.',
+          actions_taken: 'Replaced primary Viton O-ring seal kit VTN-OR-K50, executed 10-micron oil filtration loop, bled air from valve manifold, and calibrated system to 220 bar.',
+          parts_used: [
+            {
+              part_id: 'PRT-1002',
+              part_number: 'VTN-OR-K50',
+              part_name: 'Hydraulic Valve Block Viton O-Ring Seal Kit',
+              quantity: 1
+            }
+          ],
+          actual_repair_hours: 3.8,
+          resolution_remarks: 'Hydraulic pressure test completed: 220 bar holding steady under 10 continuous load cycles with zero leakage.',
+          submitted_at: '2026-10-30T15:30:00Z'
+        },
+        history: [
+          {
+            timestamp: '2026-10-29T10:00:00Z',
+            action: 'ASSIGNED',
+            performed_by_id: 'USR-007',
+            performed_by_name: 'Amit Deshmukh',
+            performed_by_role: 'MANAGER_SUPERVISOR',
+            notes: 'High priority hydraulic incident assigned.'
+          },
+          {
+            timestamp: '2026-10-29T10:12:00Z',
+            action: 'ACCEPTED',
+            performed_by_id: 'USR-019',
+            performed_by_name: 'Rajesh Menon',
+            performed_by_role: 'TECHNICIAN'
+          },
+          {
+            timestamp: '2026-10-29T11:00:00Z',
+            action: 'STARTED_REPAIR',
+            performed_by_id: 'USR-019',
+            performed_by_name: 'Rajesh Menon',
+            performed_by_role: 'TECHNICIAN'
+          },
+          {
+            timestamp: '2026-10-30T15:30:00Z',
+            action: 'MARKED_RESOLVED',
+            performed_by_id: 'USR-019',
+            performed_by_name: 'Rajesh Menon',
+            performed_by_role: 'TECHNICIAN',
+            notes: 'Submitted for manager sign-off and verification.'
+          }
+        ],
+        created_at: '2026-10-29T10:00:00Z',
+        updated_at: '2026-10-30T15:30:00Z'
+      },
+      {
+        id: 'ASN-2026-003',
+        incident_id: 'INC-0013',
+        incident_title: 'MIG Welder Robotic Arm Axis 4 Servo Position Jitter',
+        incident_description: 'Positional tracking error 0.6mm on Wrist Axis 4 during seam welding of chassis sub-frame.',
+        machine_id: 'M013',
+        machine_name: 'Robotic MIG Welding Cell 01',
+        machine_code: 'APX-ROB-01',
+        machine_location: 'Bay 2 - Robotic Assembly',
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing',
+        technician_id: 'USR-018',
+        technician_name: 'Vikram Singh',
+        technician_email: 'tech.robotics@factoryops.com',
+        technician_specialisation: 'Automation & Robotics Technician',
+        status: 'PENDING ACCEPTANCE',
+        priority: 'Critical',
+        assigned_date: '2026-10-28T14:00:00Z',
+        due_date: '2026-10-29T18:00:00Z',
+        is_overdue: true,
+        assigned_by_id: 'USR-007',
+        assigned_by_name: 'Amit Deshmukh (Manager/Supervisor)',
+        assigned_by_role: 'MANAGER_SUPERVISOR',
+        repair_progress_percent: 0,
+        identified_issue: 'Wrist Axis 4 servo driver tracking variance > 0.5mm causing rough weld bead profile',
+        root_cause_analysis: 'Optical resolver cable shielding abrasion and high electrical noise from high frequency arc stabilizer',
+        recommended_resolution: 'Replace resolver cable harness, verify ferrite chokes on 400V drive leads, recalibrate axis home offset',
+        required_tools: ['KUKA SmartPAD Teach Pendant', 'Oscilloscope Fluke 190', 'Hex Calibration Pin Set'],
+        spare_parts_required: [
+          {
+            part_id: 'PRT-1003',
+            part_number: 'TCH-TIP-12M',
+            part_name: 'MIG Welding Torch Heavy Duty Contact Tip 1.2mm',
+            quantity: 4,
+            is_in_stock: true,
+            status: 'Reserved'
+          }
+        ],
+        estimated_repair_hours: 3.0,
+        ai_recommendation_details: {
+          match_score: 95,
+          reasoning: 'Vikram Singh is a certified KUKA robotics specialist with deep experience in robotic wrist kinematics and servo tuning.',
+          required_specialisation: 'Automation & Robotics Technician',
+          matched_skills: ['KUKA KRC4 Programming', 'Servo Drive Tuning', 'Safety Interlock Wiring']
+        },
+        history: [
+          {
+            timestamp: '2026-10-28T14:00:00Z',
+            action: 'ASSIGNED',
+            performed_by_id: 'USR-007',
+            performed_by_name: 'Amit Deshmukh',
+            performed_by_role: 'MANAGER_SUPERVISOR',
+            notes: 'Critical robotic cell downtime assignment.'
+          }
+        ],
+        created_at: '2026-10-28T14:00:00Z',
+        updated_at: '2026-10-28T14:00:00Z'
+      },
+      {
+        id: 'ASN-2026-004',
+        incident_id: 'INC-0083',
+        incident_title: 'VFD Over-Torque Trip on Drive Shaft Conveyor',
+        incident_description: 'ABB ACS880 drive tripped on error 3210 (Overcurrent) during high acceleration step.',
+        machine_id: 'M005',
+        machine_name: 'Shaft Induction Hardening Unit 01',
+        machine_code: 'APX-IND-01',
+        machine_location: 'Bay 1 - Thermal Treatment',
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing',
+        technician_id: 'USR-013',
+        technician_name: 'Anil Sharma',
+        technician_email: 'tech.nova@factoryops.com',
+        technician_specialisation: 'Electrical Technician',
+        status: 'PENDING ACCEPTANCE',
+        priority: 'Medium',
+        assigned_date: '2026-10-30T11:00:00Z',
+        due_date: '2026-10-31T20:00:00Z',
+        is_overdue: false,
+        assigned_by_id: 'USR-007',
+        assigned_by_name: 'Amit Deshmukh (Manager/Supervisor)',
+        assigned_by_role: 'MANAGER_SUPERVISOR',
+        repair_progress_percent: 0,
+        identified_issue: 'Intermittent VFD trip under mechanical load transients',
+        root_cause_analysis: 'Motor thermal resistance shift and current loop gain parameter too aggressive for winter ambient',
+        recommended_resolution: 'Run motor ID run, adjust acceleration ramp from 1.8s to 2.4s, inspect motor terminal box for moisture',
+        required_tools: ['Fluke 87V Industrial Multimeter', 'Insulated Screwdriver Set 1000V', 'Megger Insulation Tester'],
+        spare_parts_required: [],
+        estimated_repair_hours: 2.0,
+        ai_recommendation_details: {
+          match_score: 92,
+          reasoning: 'Anil Sharma is skilled in VFD parameter optimization, motor protection relays, and 415V electrical panels.',
+          required_specialisation: 'Electrical Technician',
+          matched_skills: ['VFD Configuration', 'PLC Diagnostics', 'Thermal Imaging']
+        },
+        history: [
+          {
+            timestamp: '2026-10-30T11:00:00Z',
+            action: 'ASSIGNED',
+            performed_by_id: 'USR-007',
+            performed_by_name: 'Amit Deshmukh',
+            performed_by_role: 'MANAGER_SUPERVISOR',
+            notes: 'Medium severity electrical drive troubleshooting assigned.'
+          }
+        ],
+        created_at: '2026-10-30T11:00:00Z',
+        updated_at: '2026-10-30T11:00:00Z'
+      },
+      {
+        id: 'ASN-2026-005',
+        incident_id: 'INC-0021',
+        incident_title: 'Secondary Spindle Runout Deviation on Milling Center',
+        incident_description: 'Excessive spindle axial runout > 8 microns measured on finish cut stage.',
+        machine_id: 'M001',
+        machine_name: 'Apex 5-Axis CNC Machining Center 01',
+        machine_code: 'APX-CNC-01',
+        machine_location: 'Bay 1 - Heavy Machining',
+        factory_id: 'FAC-001',
+        factory_name: 'Apex Precision Manufacturing',
+        technician_id: 'USR-012',
+        technician_name: 'Ramesh Varma',
+        technician_email: 'tech.apex@factoryops.com',
+        technician_specialisation: 'Mechanical Technician',
+        status: 'PENDING ACCEPTANCE',
+        priority: 'High',
+        assigned_date: '2026-10-31T08:00:00Z',
+        due_date: '2026-11-02T18:00:00Z',
+        is_overdue: false,
+        assigned_by_id: 'USR-007',
+        assigned_by_name: 'Amit Deshmukh (Manager/Supervisor)',
+        assigned_by_role: 'MANAGER_SUPERVISOR',
+        repair_progress_percent: 0,
+        identified_issue: 'Secondary spindle taper contamination causing tool holder runout',
+        root_cause_analysis: 'Debris accumulation on BT40 taper contact face',
+        recommended_resolution: 'Clean spindle taper with cleaning arbor, verify drawbar clamping force',
+        required_tools: ['Taper Cleaning Stick', 'Clamping Force Gauge', 'Dial Indicator (0.001mm)'],
+        spare_parts_required: [],
+        estimated_repair_hours: 1.5,
+        ai_recommendation_details: {
+          match_score: 94,
+          reasoning: 'Ramesh Varma is primary mechanical technician for Apex Bay 1.',
+          required_specialisation: 'Mechanical Technician',
+          matched_skills: ['Spindle Alignment', 'Precision Machining']
+        },
+        history: [
+          {
+            timestamp: '2026-10-31T08:00:00Z',
+            action: 'ASSIGNED',
+            performed_by_id: 'USR-007',
+            performed_by_name: 'Amit Deshmukh',
+            performed_by_role: 'MANAGER_SUPERVISOR',
+            notes: 'Assigned for immediate taper inspection and runout verification.'
+          }
+        ],
+        created_at: '2026-10-31T08:00:00Z',
+        updated_at: '2026-10-31T08:00:00Z'
+      }
+    ];
+  }
+
+  public getTechnicianProfiles(factoryId: string = 'FAC-001'): TechnicianProfile[] {
+    return this.technicianProfiles.filter(p => !p.assigned_factory_id || p.assigned_factory_id === factoryId);
+  }
+
+  public getTechnicianProfile(technicianId: string): TechnicianProfile | undefined {
+    return this.technicianProfiles.find(p => p.id === technicianId || p.user_id === technicianId);
+  }
+
+  public updateTechnicianProfile(technicianId: string, updates: Partial<TechnicianProfile>): TechnicianProfile | undefined {
+    const idx = this.technicianProfiles.findIndex(p => p.id === technicianId || p.user_id === technicianId);
+    if (idx === -1) return undefined;
+    this.technicianProfiles[idx] = {
+      ...this.technicianProfiles[idx],
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+    this.persist();
+    return this.technicianProfiles[idx];
+  }
+
+  public getTechnicianAssignments(filter?: {
+    technician_id?: string;
+    factory_id?: string;
+    status?: string;
+  }): TechnicianIncidentAssignment[] {
+    let list = this.technicianAssignments;
+    if (filter?.factory_id) {
+      list = list.filter(a => a.factory_id === filter.factory_id);
+    }
+    if (filter?.technician_id) {
+      list = list.filter(a => a.technician_id === filter.technician_id);
+    }
+    if (filter?.status && filter.status !== 'ALL') {
+      list = list.filter(a => a.status === filter.status);
+    }
+
+    // Refresh dynamic overdue status
+    const now = new Date().getTime();
+    return list.map(item => {
+      const isPastDue = item.due_date ? new Date(item.due_date).getTime() < now : false;
+      const isCompleted = item.status === 'VERIFIED' || item.status === 'CLOSED';
+      return {
+        ...item,
+        is_overdue: isPastDue && !isCompleted
+      };
+    });
+  }
+
+  public getTechnicianAssignment(id: string): TechnicianIncidentAssignment | undefined {
+    const item = this.technicianAssignments.find(a => a.id === id);
+    if (!item) return undefined;
+    const now = new Date().getTime();
+    const isPastDue = item.due_date ? new Date(item.due_date).getTime() < now : false;
+    const isCompleted = item.status === 'VERIFIED' || item.status === 'CLOSED';
+    return {
+      ...item,
+      is_overdue: isPastDue && !isCompleted
+    };
+  }
+
+  public createTechnicianAssignment(data: Partial<TechnicianIncidentAssignment>): TechnicianIncidentAssignment {
+    const newId = `ASN-${Date.now().toString().slice(-6)}`;
+    const nowIso = new Date().toISOString();
+    const assignment: TechnicianIncidentAssignment = {
+      id: newId,
+      incident_id: data.incident_id || 'INC-0001',
+      incident_title: data.incident_title || 'Unscheduled Maintenance Incident',
+      incident_description: data.incident_description || '',
+      machine_id: data.machine_id || 'M001',
+      machine_name: data.machine_name || 'Machine Unit',
+      machine_code: data.machine_code,
+      machine_location: data.machine_location,
+      factory_id: data.factory_id || 'FAC-001',
+      factory_name: data.factory_name || 'Apex Precision Manufacturing',
+      technician_id: data.technician_id || 'USR-012',
+      technician_name: data.technician_name || 'Ramesh Varma',
+      technician_email: data.technician_email || 'technician@factoryops.com',
+      technician_specialisation: data.technician_specialisation || 'Mechanical Technician',
+      status: 'PENDING ACCEPTANCE',
+      priority: data.priority || 'Medium',
+      assigned_date: nowIso,
+      due_date: data.due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
+      is_overdue: false,
+      assigned_by_id: data.assigned_by_id || 'USR-007',
+      assigned_by_name: data.assigned_by_name || 'Manager',
+      assigned_by_role: data.assigned_by_role || 'MANAGER_SUPERVISOR',
+      repair_progress_percent: 0,
+      identified_issue: data.identified_issue || data.incident_title,
+      root_cause_analysis: data.root_cause_analysis,
+      recommended_resolution: data.recommended_resolution,
+      required_tools: data.required_tools || [],
+      spare_parts_required: data.spare_parts_required || [],
+      estimated_repair_hours: data.estimated_repair_hours || 2.5,
+      ai_recommendation_details: data.ai_recommendation_details,
+      progress_updates: [],
+      history: [
+        {
+          timestamp: nowIso,
+          action: 'ASSIGNED',
+          performed_by_id: data.assigned_by_id || 'USR-007',
+          performed_by_name: data.assigned_by_name || 'Manager',
+          performed_by_role: data.assigned_by_role || 'MANAGER_SUPERVISOR',
+          notes: 'Incident assigned to technician'
+        }
+      ],
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    this.technicianAssignments.unshift(assignment);
+
+    // Update technician profile workload
+    const tech = this.technicianProfiles.find(p => p.user_id === assignment.technician_id || p.id === assignment.technician_id);
+    if (tech) {
+      tech.current_workload = (tech.current_workload || 0) + 1;
+      tech.active_assignments_count = (tech.active_assignments_count || 0) + 1;
+      if (tech.current_workload >= (tech.max_concurrent_assignments || 3)) {
+        tech.availability_status = 'BUSY';
+      }
+    }
+
+    this.persist();
+    return assignment;
+  }
+
+  public updateTechnicianAssignment(id: string, updates: Partial<TechnicianIncidentAssignment>): TechnicianIncidentAssignment | undefined {
+    const idx = this.technicianAssignments.findIndex(a => a.id === id);
+    if (idx === -1) return undefined;
+
+    const prev = this.technicianAssignments[idx];
+    const prevStatus = prev.status;
+    const newStatus = updates.status || prevStatus;
+
+    // Merge updates
+    const merged: TechnicianIncidentAssignment = {
+      ...prev,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    // If new history entry provided in updates, append
+    if (updates.history && Array.isArray(updates.history)) {
+      merged.history = updates.history;
+    }
+
+    this.technicianAssignments[idx] = merged;
+
+    // Recalculate technician profile counts if status changed
+    if (newStatus !== prevStatus) {
+      const isNowFinished = newStatus === 'CLOSED' || newStatus === 'VERIFIED' || newStatus === 'REJECTED';
+      const wasFinished = prevStatus === 'CLOSED' || prevStatus === 'VERIFIED' || prevStatus === 'REJECTED';
+
+      const tech = this.technicianProfiles.find(p => p.user_id === merged.technician_id || p.id === merged.technician_id);
+      if (tech) {
+        if (isNowFinished && !wasFinished) {
+          tech.current_workload = Math.max(0, (tech.current_workload || 1) - 1);
+          tech.active_assignments_count = Math.max(0, (tech.active_assignments_count || 1) - 1);
+          if (newStatus === 'VERIFIED' || newStatus === 'CLOSED') {
+            tech.completed_repairs_count = (tech.completed_repairs_count || 0) + 1;
+          }
+          if (tech.current_workload < (tech.max_concurrent_assignments || 3) && tech.availability_status === 'BUSY') {
+            tech.availability_status = 'AVAILABLE';
+          }
+        } else if (!isNowFinished && wasFinished) {
+          tech.current_workload = (tech.current_workload || 0) + 1;
+          tech.active_assignments_count = (tech.active_assignments_count || 0) + 1;
+        }
+      }
+    }
+
+    this.persist();
+    return merged;
+  }
+
+  // --- AI RECOMMENDATION LOGIC ---
+  public recommendTechnicianForIncident(incidentId: string) {
+    const incident = this.incidents.find(i => i.id === incidentId);
+    const machine = incident ? this.machines.find(m => m.id === incident.machine_id) : undefined;
+    const factoryId = incident?.factory_id || 'FAC-001';
+
+    const textToAnalyze = [
+      incident?.title || '',
+      incident?.description || '',
+      incident?.incident_type || '',
+      machine?.name || '',
+      machine?.machine_type || ''
+    ].join(' ').toLowerCase();
+
+    // Determine target primary specialisation and required skills
+    let targetSpec: TechnicianProfile['specialisation'] = 'Mechanical Technician';
+    let secondarySpec: TechnicianProfile['specialisation'] = 'CNC Technician';
+    let requiredSkills: string[] = ['Spindle Alignment', 'Bearing Replacement', 'Vibration Analysis'];
+    let requiredTools: string[] = ['Dial Test Indicator (0.001mm)', 'Torque Wrench 40Nm', 'Bearing Induction Heater'];
+    let suggestedParts: any[] = [];
+    let estHours = 3.0;
+
+    if (textToAnalyze.includes('robot') || textToAnalyze.includes('welder') || textToAnalyze.includes('kuka') || textToAnalyze.includes('abb') || textToAnalyze.includes('servo') || textToAnalyze.includes('gripper') || textToAnalyze.includes('teach pendant')) {
+      targetSpec = 'Automation & Robotics Technician';
+      secondarySpec = 'Electrical Technician';
+      requiredSkills = ['KUKA KRC4 Programming', 'ABB IRC5 Calibration', 'EOAT Pneumatics', 'Servo Drive Tuning'];
+      requiredTools = ['KUKA SmartPAD Teach Pendant', 'Oscilloscope Fluke 190', 'Hex Calibration Pin Set'];
+      suggestedParts = this.spareParts.filter(p => p.machine_compatibility?.some(c => c.includes('ROB') || c.includes('M013'))).slice(0, 2);
+      estHours = 3.5;
+    } else if (textToAnalyze.includes('hydraulic') || textToAnalyze.includes('pneumatic') || textToAnalyze.includes('pressure') || textToAnalyze.includes('ram') || textToAnalyze.includes('valve') || textToAnalyze.includes('oil weeping') || textToAnalyze.includes('leak') || textToAnalyze.includes('cylinder') || textToAnalyze.includes('tonnage')) {
+      targetSpec = 'Hydraulic & Pneumatic Technician';
+      secondarySpec = 'Mechanical Technician';
+      requiredSkills = ['Proportional Valve Calibration', 'Accumulator Charging', 'High-Pressure Hose Crimp', 'Pneumatic Manifold Troubleshooting'];
+      requiredTools = ['Hydraulic Pressure Gauge Kit (0-400 Bar)', 'Spanner Set 32mm', 'Fluid Bleed Hose'];
+      suggestedParts = this.spareParts.filter(p => p.category === 'Hydraulics' || p.machine_compatibility?.some(c => c.includes('PRS') || c.includes('M007'))).slice(0, 2);
+      estHours = 4.0;
+    } else if (textToAnalyze.includes('cnc') || textToAnalyze.includes('spindle') || textToAnalyze.includes('grinder') || textToAnalyze.includes('chatter') || textToAnalyze.includes('backlash') || textToAnalyze.includes('milling') || textToAnalyze.includes('lathe') || textToAnalyze.includes('g-code')) {
+      targetSpec = 'CNC Technician';
+      secondarySpec = 'Mechanical Technician';
+      requiredSkills = ['Fanuc 31i Diagnostics', 'Ballscrew Backlash Calibration', 'Tool Changer Alignment', 'G-Code Optimization'];
+      requiredTools = ['Dial Test Indicator (0.001mm)', 'Magnetic Base', 'Spindle Runout Arbor', 'Torque Wrench 10-100Nm'];
+      suggestedParts = this.spareParts.filter(p => p.category === 'Mechanical' || p.machine_compatibility?.some(c => c.includes('CNC') || c.includes('M001'))).slice(0, 2);
+      estHours = 3.0;
+    } else if (textToAnalyze.includes('sensor') || textToAnalyze.includes('optical') || textToAnalyze.includes('scanner') || textToAnalyze.includes('ndt') || textToAnalyze.includes('laser') || textToAnalyze.includes('loop') || textToAnalyze.includes('transmitter') || textToAnalyze.includes('scada')) {
+      targetSpec = 'Instrumentation Technician';
+      secondarySpec = 'Electrical Technician';
+      requiredSkills = ['4-20mA Loop Calibration', 'RTD & Thermocouple Verification', 'SCADA I/O Mapping', 'Pressure Transmitter Calibration'];
+      requiredTools = ['Fluke 789 ProcessMeter', 'Laser Alignment Sensor', 'Thermocouple Calibrator'];
+      suggestedParts = this.spareParts.filter(p => p.category === 'Consumables').slice(0, 2);
+      estHours = 2.5;
+    } else if (textToAnalyze.includes('power') || textToAnalyze.includes('electrical') || textToAnalyze.includes('vfd') || textToAnalyze.includes('trip') || textToAnalyze.includes('breaker') || textToAnalyze.includes('overcurrent') || textToAnalyze.includes('voltage') || textToAnalyze.includes('short') || textToAnalyze.includes('motor')) {
+      targetSpec = 'Electrical Technician';
+      secondarySpec = 'Instrumentation Technician';
+      requiredSkills = ['PLC Diagnostics', 'VFD Configuration', 'Control Panel Wiring', 'Thermal Imaging'];
+      requiredTools = ['Fluke 87V Industrial Multimeter', 'Insulated Screwdriver Set 1000V', 'Megger Insulation Tester'];
+      suggestedParts = [];
+      estHours = 2.0;
+    }
+
+    // Fallback spare part if none matched
+    if (suggestedParts.length === 0 && this.spareParts.length > 0) {
+      suggestedParts = [this.spareParts[0]];
+    }
+
+    // Evaluate all technicians for this factory
+    const profiles = this.getTechnicianProfiles(factoryId);
+    const scoredCandidates = profiles.map(tech => {
+      let score = 0;
+      const matchedSkills: string[] = [];
+
+      // 1. Specialisation matching
+      if (tech.specialisation === targetSpec) {
+        score += 50;
+      } else if (tech.secondary_specialisations?.includes(targetSpec) || tech.specialisation === secondarySpec) {
+        score += 28;
+      } else {
+        score += 10;
+      }
+
+      // 2. Technical skill overlap
+      for (const reqSkill of requiredSkills) {
+        if (tech.technical_skills.some(ts => ts.toLowerCase().includes(reqSkill.toLowerCase()) || reqSkill.toLowerCase().includes(ts.toLowerCase()))) {
+          matchedSkills.push(reqSkill);
+          score += 8;
+        }
+      }
+
+      // 3. Availability status
+      if (tech.availability_status === 'AVAILABLE') {
+        score += 20;
+      } else if (tech.availability_status === 'BUSY') {
+        score += 5;
+      } else {
+        score -= 40;
+      }
+
+      // 4. Current Workload penalty
+      score -= (tech.current_workload || 0) * 6;
+
+      // 5. Rating and experience boost
+      score += Math.round((tech.rating || 4.5) * 2) + Math.min(10, Math.round(tech.experience_years * 0.8));
+
+      // Calculate match percentage (clamped between 35% and 99%)
+      const matchPercentage = Math.min(99, Math.max(35, Math.round((score / 115) * 100)));
+
+      let reasoning = '';
+      if (tech.specialisation === targetSpec && tech.availability_status === 'AVAILABLE') {
+        reasoning = `Direct specialisation match in ${targetSpec} with verified skills in ${matchedSkills.join(', ') || 'required systems'}. Currently available with manageable workload (${tech.current_workload} active).`;
+      } else if (tech.specialisation === targetSpec && tech.availability_status === 'BUSY') {
+        reasoning = `High skill match for ${targetSpec}, but currently has ${tech.current_workload} active assignments.`;
+      } else if (matchedSkills.length > 0) {
+        reasoning = `Secondary match with competencies in ${matchedSkills.join(', ')}.`;
+      } else {
+        reasoning = `Cross-domain technician with general electro-mechanical troubleshooting capabilities.`;
+      }
+
+      return {
+        technician: tech,
+        score,
+        match_percentage: matchPercentage,
+        matched_skills: matchedSkills,
+        reasoning
+      };
+    });
+
+    // Rank descending by score
+    scoredCandidates.sort((a, b) => b.score - a.score);
+    const topMatch = scoredCandidates[0];
+
+    return {
+      recommended_technician: topMatch.technician,
+      recommended_score: topMatch.score,
+      recommended_percentage: topMatch.match_percentage,
+      reasoning: `AI recommends ${topMatch.technician.name} (${topMatch.technician.specialisation}): ${topMatch.reasoning}`,
+      required_specialisation: targetSpec,
+      secondary_specialisation: secondarySpec,
+      required_skills: requiredSkills,
+      suggested_spare_parts: suggestedParts.map(p => ({
+        part_id: p.id,
+        part_number: p.part_number,
+        part_name: p.name,
+        quantity: 1,
+        is_in_stock: p.stock_quantity > 0,
+        status: p.stock_quantity > 0 ? 'In Stock' : 'Low Stock'
+      })),
+      required_tools: requiredTools,
+      estimated_repair_hours: estHours,
+      all_candidates: scoredCandidates
+    };
   }
 }
 

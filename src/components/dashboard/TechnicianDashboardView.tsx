@@ -1,5 +1,8 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Machine, WorkOrder, MaintenanceRecord, Incident, SOP } from '../../types/index.ts';
+import { useAuth } from '../../contexts/AuthContext.tsx';
+import { useData } from '../../contexts/DataContext.tsx';
+import { TechnicianAssignmentCard } from '../technician/TechnicianAssignmentCard.tsx';
 import {
   PowerBiBanner,
   PowerBiCard,
@@ -20,7 +23,26 @@ import {
   Pie,
   Cell
 } from 'recharts';
-import { Wrench, ArrowUpRight, ClipboardList, Clock, Settings } from 'lucide-react';
+import {
+  Wrench,
+  ArrowUpRight,
+  ClipboardList,
+  Clock,
+  Settings,
+  Sparkles,
+  ShieldCheck,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  User,
+  Star,
+  Layers,
+  Inbox,
+  Filter,
+  Briefcase,
+  Calendar,
+  Building2
+} from 'lucide-react';
 
 interface TechnicianDashboardViewProps {
   machines: Machine[];
@@ -40,7 +62,96 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
   onSelectMachine,
   onOpenWorkOrderModal
 }) => {
-  // Machine lookup map for easy name resolution
+  const { user } = useAuth();
+  const {
+    technicianProfiles,
+    technicianAssignments,
+    acceptTechnicianAssignment,
+    rejectTechnicianAssignment,
+    requestAssignmentReassignment,
+    startAssignmentRepair,
+    updateAssignmentProgress,
+    resolveAssignment
+  } = useData();
+
+  const [assignmentFilter, setAssignmentFilter] = useState<'ALL' | 'PENDING ACCEPTANCE' | 'IN PROGRESS' | 'RESOLVED_PENDING_VERIFICATION' | 'OVERDUE'>('ALL');
+
+  // Find profile of logged in technician or default to first profile
+  const myProfile = useMemo(() => {
+    if (!user) return technicianProfiles[0] || null;
+    return technicianProfiles.find(p => p.user_id === user.id || p.email === user.email) || technicianProfiles[0] || null;
+  }, [technicianProfiles, user]);
+
+  // Filter assignments for this technician
+  const myAssignments = useMemo(() => {
+    let list = technicianAssignments;
+    if (user?.role === 'TECHNICIAN') {
+      list = list.filter(a => {
+        const matchesUserId = a.technician_id === user.id;
+        const matchesEmail = a.technician_email?.toLowerCase() === user.email?.toLowerCase();
+        const matchesProfile = myProfile && (a.technician_id === myProfile.id || a.technician_id === myProfile.user_id);
+        const matchesName = user.name && a.technician_name && (
+          a.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+          user.name.toLowerCase().includes(a.technician_name.toLowerCase().split(' ')[0])
+        );
+        return matchesUserId || matchesEmail || matchesProfile || matchesName;
+      });
+    } else if (myProfile) {
+      list = list.filter(a => a.technician_id === myProfile.user_id || a.technician_id === myProfile.id || a.technician_email === myProfile.email);
+    }
+    return list;
+  }, [technicianAssignments, user, myProfile]);
+
+  const filteredAssignments = useMemo(() => {
+    if (assignmentFilter === 'ALL') return myAssignments;
+    if (assignmentFilter === 'OVERDUE') return myAssignments.filter(a => a.is_overdue);
+    if (assignmentFilter === 'PENDING ACCEPTANCE') {
+      return myAssignments.filter(a => {
+        const st = (a.status || '').toUpperCase().trim();
+        return st === 'PENDING ACCEPTANCE' || st === 'PENDING_ACCEPTANCE' || st === 'PENDING';
+      });
+    }
+    if (assignmentFilter === 'IN PROGRESS') {
+      return myAssignments.filter(a => {
+        const st = (a.status || '').toUpperCase().trim();
+        return st === 'IN PROGRESS' || st === 'IN_PROGRESS';
+      });
+    }
+    if (assignmentFilter === 'RESOLVED_PENDING_VERIFICATION') {
+      return myAssignments.filter(a => {
+        const st = (a.status || '').toUpperCase().trim();
+        return st === 'RESOLVED_PENDING_VERIFICATION' || st === 'RESOLVED';
+      });
+    }
+    return myAssignments.filter(a => a.status === assignmentFilter);
+  }, [myAssignments, assignmentFilter]);
+
+  const pendingAcceptanceCount = useMemo(() => {
+    return myAssignments.filter(a => {
+      const st = (a.status || '').toUpperCase().trim();
+      return st === 'PENDING ACCEPTANCE' || st === 'PENDING_ACCEPTANCE' || st === 'PENDING';
+    }).length;
+  }, [myAssignments]);
+
+  const inProgressCount = useMemo(() => {
+    return myAssignments.filter(a => {
+      const st = (a.status || '').toUpperCase().trim();
+      return st === 'IN PROGRESS' || st === 'IN_PROGRESS';
+    }).length;
+  }, [myAssignments]);
+
+  const awaitingVerificationCount = useMemo(() => {
+    return myAssignments.filter(a => {
+      const st = (a.status || '').toUpperCase().trim();
+      return st === 'RESOLVED_PENDING_VERIFICATION' || st === 'RESOLVED';
+    }).length;
+  }, [myAssignments]);
+
+  const overdueCount = useMemo(() => {
+    return myAssignments.filter(a => a.is_overdue).length;
+  }, [myAssignments]);
+
+  // Machine lookup map
   const machineMap = useMemo(() => {
     const map = new Map<string, Machine>();
     machines.forEach(m => {
@@ -50,7 +161,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     return map;
   }, [machines]);
 
-  // Section 3: Top 3 KPI metrics from work orders
   const myAssignedTasksCount = useMemo(() => {
     const assigned = workOrders.filter(w =>
       w.assigned_to === 'Vikram Singh' ||
@@ -68,7 +178,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     return workOrders.filter(w => w.status === 'In Progress').length;
   }, [workOrders]);
 
-  // Section 4 (Left): Failure Categories (Count of incident_id by failure_category)
   const commonFailureCategories = useMemo(() => {
     const counts: Record<string, number> = {};
     incidents.forEach(inc => {
@@ -84,7 +193,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
       .sort((a, b) => b.count - a.count);
   }, [incidents]);
 
-  // Section 4 (Right): Maintenance History records & total duration
   const maintenanceHistoryRows = useMemo(() => {
     return maintenance.map(m => {
       const machine = machineMap.get(m.machine_id);
@@ -95,7 +203,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
         duration_minutes: Number(m.duration_minutes) || 0,
         machine_id: m.machine_id,
         machine_name: machine?.name || m.machine_name || m.machine_id,
-        technician_name: m.technician_name || m.technician || 'Vikram Singh'
+        technician_name: m.technician_name || m.technician || 'Ramesh Varma'
       };
     });
   }, [maintenance, machineMap]);
@@ -104,7 +212,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     return maintenance.reduce((sum, m) => sum + (Number(m.duration_minutes) || 0), 0);
   }, [maintenance]);
 
-  // Section 5: Machines with open/recent incidents table
   const incidentRows = useMemo(() => {
     return incidents.map(inc => {
       const machine = machineMap.get(inc.machine_id);
@@ -122,7 +229,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     });
   }, [incidents, machineMap]);
 
-  // Section 6 (A): Downtime by Machine (Sum of downtime_minutes by machine_name)
   const downtimeByMachine = useMemo(() => {
     const map: Record<string, number> = {};
     incidents.forEach(inc => {
@@ -140,7 +246,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
       .slice(0, 10);
   }, [incidents, machineMap]);
 
-  // Section 6 (B): Open Work Orders by Priority
   const workOrdersByPriority = useMemo(() => {
     const counts: Record<string, number> = {
       Medium: 0,
@@ -162,7 +267,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     ];
   }, [workOrders]);
 
-  // Section 6 (C): Incidents by Severity (Donut)
   const incidentsBySeverity = useMemo(() => {
     const counts: Record<string, number> = { High: 0, Medium: 0, Low: 0, Critical: 0 };
     incidents.forEach(inc => {
@@ -179,23 +283,215 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
   }, [incidents]);
 
   return (
-    <div className="max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 font-sans text-[#191923]">
-      {/* SECTION 2: TECHNICIAN DASHBOARD TITLE BAR */}
-      <PowerBiBanner
-        title="Technician Maintenance & Repair Dashboard"
-        subtitle="Active Work Orders, Maintenance Logs, Failure Modes & Machine Incidents"
-        actions={
-          <button
-            onClick={onOpenWorkOrderModal}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-lg bg-[#0E79B2] hover:bg-[#0c6799] text-white transition-colors shadow-sm cursor-pointer whitespace-nowrap"
-          >
-            <Wrench className="w-3.5 h-3.5" />
-            <span>+ Work Order</span>
-          </button>
-        }
-      />
+    <div className="max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 font-sans text-slate-900">
+      {/* 1. TECHNICIAN PROFILE HEADER CARD (White, FactoryOps Reference Matching) */}
+      {myProfile && (
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="flex items-center gap-3.5">
+              <div className="w-11 h-11 rounded-xl bg-[#794628] text-white font-black text-base flex items-center justify-center shrink-0 shadow-2xs">
+                {(myProfile.name || 'Technician').split(' ').map(n => n[0]).slice(0, 2).join('')}
+              </div>
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-lg font-extrabold text-slate-900 tracking-tight">
+                    {myProfile.name || 'Ramesh Varma'} <span className="font-semibold text-slate-600 text-sm">(Senior Technician)</span>
+                  </h2>
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100/90 text-amber-950 border border-amber-300">
+                    {myProfile.specialisation || 'Mechanical Technician'}
+                  </span>
+                  {myProfile.secondary_specialisations?.map((sec, i) => (
+                    <span key={i} className="px-3 py-1 rounded-full text-xs font-bold bg-blue-100/90 text-blue-950 border border-blue-300">
+                      {sec}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-600 mt-1 font-medium">
+                  <span className="flex items-center gap-1">
+                    <span>Factory: <strong className="text-slate-900 font-bold">Apex Precision (FAC-001)</strong></span>
+                  </span>
+                  <span>|</span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Shift: <strong className="text-slate-900 font-bold">{myProfile.shift || 'Morning (06:00 – 14:00)'}</strong></span>
+                  </span>
+                  <span>|</span>
+                  <span className="flex items-center gap-1">
+                    <Briefcase className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Experience: <strong className="text-slate-900 font-bold">{myProfile.experience_years || 8} years</strong></span>
+                  </span>
+                  <span>|</span>
+                  <span className="flex items-center gap-1 text-amber-700 font-bold">
+                    <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500" />
+                    {myProfile.rating || 4.9} / 5.0
+                  </span>
+                </div>
+              </div>
+            </div>
 
-      {/* SECTION 3: KEY PERFORMANCE INDICATORS (3 KPI CARDS) */}
+            {/* Right: Availability Status & Active Workload */}
+            <div className="flex items-center justify-between sm:justify-end gap-6 pt-3 lg:pt-0 border-t lg:border-t-0 lg:border-l border-slate-200 lg:pl-6">
+              <div>
+                <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider mb-1">
+                  Availability Status
+                </span>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold ${
+                  myProfile.availability_status === 'AVAILABLE' || myProfile.availability_status === 'Available'
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${
+                    myProfile.availability_status === 'AVAILABLE' || myProfile.availability_status === 'Available' ? 'bg-emerald-600 animate-pulse' : 'bg-amber-600'
+                  }`} />
+                  {myProfile.availability_status || 'Available'}
+                </span>
+              </div>
+
+              <div className="text-right">
+                <span className="text-[11px] text-slate-500 block font-bold uppercase tracking-wider mb-1">
+                  Active Workload
+                </span>
+                <div className="text-lg text-slate-900 font-mono font-black">
+                  {myAssignments.filter(a => a.status === 'IN PROGRESS' || a.status === 'PENDING ACCEPTANCE' || a.status === 'ACCEPTED').length} / {myProfile.max_concurrent_assignments || 3} Tasks
+                </div>
+                <span className="text-xs text-slate-500 font-medium">
+                  {myProfile.completed_repairs_count || 3} repairs completed
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. ACTIONABLE INCIDENT ASSIGNMENTS SECTION */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 space-y-4 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#794628] text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <Wrench className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <span>Actionable Incident Assignments & Response</span>
+                {pendingAcceptanceCount > 0 && (
+                  <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500 text-white animate-bounce">
+                    {pendingAcceptanceCount} Action Required
+                  </span>
+                )}
+              </h3>
+              <p className="text-xs text-slate-600 font-medium">
+                Review assigned machine incidents, accept or reject assignments, log repair diagnostics, and submit resolution for sign-off.
+              </p>
+            </div>
+          </div>
+
+          {/* Filter Pills (Exact match to FactoryOps design reference) */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-1 md:pt-0">
+            <button
+              type="button"
+              onClick={() => setAssignmentFilter('ALL')}
+              className={`px-4 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${
+                assignmentFilter === 'ALL'
+                  ? 'bg-[#794628] text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700'
+              }`}
+            >
+              All ({myAssignments.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssignmentFilter('PENDING ACCEPTANCE')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                assignmentFilter === 'PENDING ACCEPTANCE'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700'
+              }`}
+            >
+              Pending ({pendingAcceptanceCount})
+              {pendingAcceptanceCount > 0 && (
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssignmentFilter('IN PROGRESS')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${
+                assignmentFilter === 'IN PROGRESS'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700'
+              }`}
+            >
+              In Progress ({inProgressCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setAssignmentFilter('RESOLVED_PENDING_VERIFICATION')}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer shadow-2xs ${
+                assignmentFilter === 'RESOLVED_PENDING_VERIFICATION'
+                  ? 'bg-purple-600 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-50 border border-slate-200 text-slate-700'
+              }`}
+            >
+              Pending Sign-off ({awaitingVerificationCount})
+            </button>
+            {overdueCount > 0 && (
+              <button
+                type="button"
+                onClick={() => setAssignmentFilter('OVERDUE')}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer shadow-2xs ${
+                  assignmentFilter === 'OVERDUE'
+                    ? 'bg-rose-600 text-white shadow-xs'
+                    : 'bg-white hover:bg-rose-50 border border-rose-300 text-rose-800'
+                }`}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Overdue ({overdueCount})
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Assignments Cards Grid */}
+        {filteredAssignments.length > 0 ? (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filteredAssignments.map(asn => (
+              <TechnicianAssignmentCard
+                key={asn.id}
+                assignment={asn}
+                onAccept={async (id) => { await acceptTechnicianAssignment(id); }}
+                onReject={async (id, reason) => { await rejectTechnicianAssignment(id, reason); }}
+                onRequestReassignment={async (id, reason) => { await requestAssignmentReassignment(id, reason); }}
+                onStartRepair={async (id) => { await startAssignmentRepair(id); }}
+                onUpdateProgress={async (id, percent, notes, additionalProblems) => {
+                  await updateAssignmentProgress(id, {
+                    progress_percent: percent,
+                    diagnosis_notes: notes,
+                    additional_problems_found: additionalProblems
+                  });
+                }}
+                onResolve={async (id, submission) => {
+                  await resolveAssignment(id, submission);
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="py-12 px-4 text-center rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mx-auto">
+              <Inbox className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-slate-900">
+              No incident assignments found in this view
+            </h4>
+            <p className="text-xs text-slate-600 font-medium max-w-md mx-auto">
+              {assignmentFilter === 'ALL'
+                ? 'You have no incident assignments currently assigned. All assigned machinery is operating under standard status.'
+                : `No assignments currently match the filter "${assignmentFilter}". Switch to 'All' to see all assignments.`}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: KEY PERFORMANCE INDICATORS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
         <PowerBiCard
           title="MY ASSIGNED TASKS"
@@ -228,7 +524,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
 
       {/* SECTION 4: FAILURE CATEGORIES AND MAINTENANCE HISTORY */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-        {/* Left Column (Failure Categories) */}
         <div className="lg:col-span-5 min-w-0">
           <PowerBiVisualContainer
             title="FAILURE CATEGORIES"
@@ -274,7 +569,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
           </PowerBiVisualContainer>
         </div>
 
-        {/* Right Column (Maintenance History by Machine) */}
         <div className="lg:col-span-7 min-w-0">
           <PowerBiVisualContainer
             title="MAINTENANCE HISTORY BY MACHINE"
@@ -291,7 +585,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
             }
           >
             <div className="h-full flex flex-col justify-between">
-              {/* Table Scrollable Container */}
               <div className="w-full overflow-x-auto overflow-y-auto max-h-[250px] text-xs">
                 <table className="w-full text-left border-collapse border border-slate-200 min-w-[650px]">
                   <thead className="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200 font-bold text-[10.5px] uppercase tracking-wider">
@@ -323,7 +616,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                 </table>
               </div>
 
-              {/* Footer Summary */}
               <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 flex items-center justify-between text-xs font-bold text-[#191923] shrink-0">
                 <span className="text-slate-500 uppercase tracking-wider text-[10.5px]">Total Logged Duration</span>
                 <span className="font-mono text-[#0E79B2] text-sm font-extrabold">{formatWholeNumber(totalMaintenanceDuration)} min</span>
@@ -397,9 +689,8 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
         </PowerBiVisualContainer>
       </div>
 
-      {/* SECTION 6: OPERATIONAL ANALYTICS (3 CHARTS) */}
+      {/* SECTION 6: OPERATIONAL ANALYTICS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        {/* Chart A: DOWNTIME BY MACHINE */}
         <div className="min-w-0">
           <PowerBiVisualContainer
             title="DOWNTIME BY MACHINE"
@@ -449,7 +740,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
           </PowerBiVisualContainer>
         </div>
 
-        {/* Chart B: WORK ORDERS BY PRIORITY */}
         <div className="min-w-0">
           <PowerBiVisualContainer
             title="WORK ORDERS BY PRIORITY"
@@ -498,7 +788,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
           </PowerBiVisualContainer>
         </div>
 
-        {/* Chart C: INCIDENTS BY SEVERITY */}
         <div className="min-w-0 md:col-span-2 lg:col-span-1">
           <PowerBiVisualContainer
             title="INCIDENTS BY SEVERITY"
@@ -506,7 +795,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
             heightClass="h-[340px]"
           >
             <div className="h-full flex flex-col justify-between">
-              {/* Legend Top */}
               <div className="flex items-center justify-center gap-3 text-[10.5px] text-slate-700 pt-1">
                 {incidentsBySeverity.map(entry => (
                   <div key={entry.name} className="flex items-center gap-1.5">
@@ -516,7 +804,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                 ))}
               </div>
 
-              {/* Donut Chart with Centered Number */}
               <div className="relative flex-1 flex items-center justify-center my-1">
                 <ResponsiveContainer width="100%" height={190}>
                   <PieChart>
@@ -546,7 +833,6 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                 </div>
               </div>
 
-              {/* Bottom Percentage Indicators */}
               <div className="flex items-center justify-around text-[10.5px] text-slate-600 py-1.5 border-t border-slate-100 font-mono font-semibold">
                 <span>High: 46.8%</span>
                 <span>Med: 43.1%</span>

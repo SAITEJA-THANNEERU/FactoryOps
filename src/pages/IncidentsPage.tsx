@@ -4,16 +4,31 @@ import { SeverityBadge } from '../components/SeverityBadge.tsx';
 import { StatusBadge } from '../components/StatusBadge.tsx';
 import { CreateIncidentModal } from '../components/CreateIncidentModal.tsx';
 import { CreateWorkOrderModal } from '../components/CreateWorkOrderModal.tsx';
-import { AlertTriangle, Plus, Trash2, CheckCircle, Wrench } from 'lucide-react';
+import { AssignTechnicianModal } from '../components/technician/AssignTechnicianModal.tsx';
+import { IncidentSelectionModal } from '../components/technician/IncidentSelectionModal.tsx';
+import { AlertTriangle, Plus, Trash2, CheckCircle, Wrench, Sparkles } from 'lucide-react';
 import type { Incident } from '../types/index.ts';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
 export const IncidentsPage: React.FC = () => {
-  const { incidents, machines, createIncident, updateIncident, deleteIncident, createWorkOrder } = useData();
+  const {
+    incidents,
+    machines,
+    technicianProfiles,
+    technicianAssignments,
+    createIncident,
+    updateIncident,
+    deleteIncident,
+    createWorkOrder,
+    assignTechnicianToIncident
+  } = useData();
   const { highlightId, isHighlighted, highlightRef, highlightClass } = useSearchHighlight();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConvertModalOpen, setIsConvertModalOpen] = useState(false);
   const [selectedIncidentForWO, setSelectedIncidentForWO] = useState<Incident | null>(null);
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+  const [isIncidentSelectionOpen, setIsIncidentSelectionOpen] = useState(false);
+  const [selectedIncidentForAssign, setSelectedIncidentForAssign] = useState<string | undefined>(undefined);
   const [filterSeverity, setFilterSeverity] = useState('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -65,13 +80,22 @@ export const IncidentsPage: React.FC = () => {
             Real-time equipment stoppages, quality deviations, and operator reports
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Report Incident</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsIncidentSelectionOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI Dispatch Hub</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Report Incident</span>
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">
@@ -144,6 +168,17 @@ export const IncidentsPage: React.FC = () => {
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => {
+                            setSelectedIncidentForAssign(inc.id || inc.incident_id);
+                            setIsAssignModalOpen(true);
+                          }}
+                          title="Assign incident to technician using AI skill matching"
+                          className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3 text-indigo-600" />
+                          <span>AI Assign Tech</span>
+                        </button>
+                        <button
+                          onClick={() => {
                             setSelectedIncidentForWO(inc);
                             setIsConvertModalOpen(true);
                           }}
@@ -200,6 +235,33 @@ export const IncidentsPage: React.FC = () => {
           if (selectedIncidentForWO) {
             await updateIncident(selectedIncidentForWO.id, { status: 'Investigating' });
           }
+        }}
+      />
+
+      <AssignTechnicianModal
+        isOpen={isAssignModalOpen}
+        onClose={() => {
+          setIsAssignModalOpen(false);
+          setSelectedIncidentForAssign(undefined);
+        }}
+        incidents={incidents}
+        machines={machines}
+        technicians={technicianProfiles}
+        initialIncidentId={selectedIncidentForAssign}
+        onAssignSubmit={async (data) => {
+          await assignTechnicianToIncident(data);
+        }}
+      />
+
+      <IncidentSelectionModal
+        isOpen={isIncidentSelectionOpen}
+        onClose={() => setIsIncidentSelectionOpen(false)}
+        incidents={incidents}
+        machines={machines}
+        assignments={technicianAssignments}
+        onSelectIncident={(inc) => {
+          setSelectedIncidentForAssign(inc.id || inc.incident_id);
+          setIsAssignModalOpen(true);
         }}
       />
     </div>

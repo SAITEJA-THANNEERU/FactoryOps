@@ -421,3 +421,225 @@ export interface SystemAuditLog {
   timestamp: string;
 }
 
+// ==========================================
+// TECHNICIAN INCIDENT ASSIGNMENT & RESOLUTION
+// ==========================================
+
+export type TechnicianSpecialisation =
+  | 'Mechanical Technician'
+  | 'Electrical Technician'
+  | 'CNC Technician'
+  | 'Automation & Robotics Technician'
+  | 'Hydraulic & Pneumatic Technician'
+  | 'Instrumentation Technician';
+
+export type TechnicianAvailabilityStatus = 'Available' | 'On Task' | 'Busy' | 'On Leave' | 'AVAILABLE' | 'BUSY' | 'ON_LEAVE' | string;
+
+export interface TechnicianProfile {
+  id?: string;
+  user_id?: string;
+  technician_id?: string;
+  name?: string;
+  technician_name?: string;
+  email: string;
+  specialisation: TechnicianSpecialisation | string;
+  secondary_specialisations?: string[];
+  technical_skills: string[];
+  experience_years: number;
+  assigned_factory?: string;
+  assigned_factory_id?: string;
+  assigned_factory_name?: string;
+  availability_status: TechnicianAvailabilityStatus;
+  current_workload: number;
+  active_assignments?: number;
+  active_assignments_count?: number;
+  max_concurrent_assignments?: number;
+  completed_assignments?: number;
+  completed_repairs_count?: number;
+  certifications?: string[];
+  shift?: string;
+  phone?: string;
+  rating?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type IncidentAssignmentStatus =
+  | 'PENDING ACCEPTANCE'
+  | 'ACCEPTED'
+  | 'IN PROGRESS'
+  | 'RESOLVED – PENDING VERIFICATION'
+  | 'RESOLVED_PENDING_VERIFICATION'
+  | 'VERIFIED'
+  | 'CLOSED'
+  | 'REJECTED'
+  | 'REASSIGNMENT REQUESTED'
+  | 'REASSIGNMENT_REQUESTED'
+  | 'REASSIGNMENT APPROVED'
+  | 'REASSIGNMENT REJECTED'
+  | string;
+
+export interface RepairProgressUpdate {
+  id?: string;
+  timestamp: string;
+  notes?: string;
+  diagnosis_notes?: string;
+  additional_problems_found?: string;
+  progress_percent: number;
+  reported_problems?: string;
+  technician_name?: string;
+  updated_by_id?: string;
+  updated_by_name?: string;
+}
+
+export interface IncidentResolutionSubmission {
+  confirmed_root_cause: string;
+  repair_actions?: string;
+  actions_taken?: string;
+  spare_parts_used?: string[];
+  parts_used?: any[];
+  actual_hours?: number;
+  actual_repair_hours?: number;
+  resolution_remarks?: string;
+  before_photo_url?: string;
+  after_photo_url?: string;
+  submitted_at?: string;
+}
+
+export interface IncidentVerificationDetails {
+  verified_by_id: string;
+  verified_by_name: string;
+  verified_by_role?: string;
+  verified_at: string;
+  approved?: boolean;
+  decision?: 'APPROVE' | 'REJECT';
+  remarks?: string;
+  verification_notes?: string;
+  quality_rating?: number;
+}
+
+export interface AssignmentHistoryEntry {
+  id?: string;
+  timestamp: string;
+  actor_id?: string;
+  actor_name?: string;
+  actor_role?: UserRole | string;
+  performed_by_id?: string;
+  performed_by_name?: string;
+  performed_by_role?: string;
+  action: string;
+  status?: IncidentAssignmentStatus;
+  notes?: string;
+}
+
+export interface TechnicianIncidentAssignment {
+  id: string;
+  incident_id: string;
+  incident_title?: string;
+  incident_description?: string;
+  factory_id: string;
+  factory_name?: string;
+
+  // Technician Information
+  technician_id: string;
+  technician_name: string;
+  technician_email: string;
+  technician_specialisation: TechnicianSpecialisation | string;
+
+  // Machine Information
+  machine_id: string;
+  machine_name: string;
+  machine_type?: string;
+  machine_code?: string;
+  machine_location?: string;
+
+  // Incident Information
+  title?: string;
+  issue_description?: string;
+  identified_issue?: string;
+  root_cause?: string;
+  root_cause_analysis?: string;
+  recommended_resolution?: string;
+  priority: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+
+  // Repair Information
+  required_spare_parts?: string[];
+  spare_parts_required?: any[];
+  required_tools?: string[];
+  estimated_repair_time_hours?: number;
+  estimated_repair_hours?: number;
+  assigned_date: string;
+  due_date: string;
+  is_overdue?: boolean;
+  repair_progress_percent?: number;
+
+  // Workflow State
+  status: IncidentAssignmentStatus;
+  assigned_by_id: string;
+  assigned_by_name: string;
+  assigned_by_role?: string;
+
+  // AI Recommendation Details
+  ai_match_score?: number;
+  ai_match_reasons?: string[];
+  ai_recommendation_details?: any;
+
+  // Acceptance / Rejection Tracking
+  accepted_at?: string;
+  rejected_at?: string;
+  rejection_reason?: string;
+
+  // Reassignment Tracking
+  reassignment_requested_at?: string;
+  reassignment_reason?: string;
+  reassignment_status?: 'Pending' | 'Approved' | 'Rejected' | string;
+  reassignment_review_notes?: string;
+
+  // Repair Execution & Resolution
+  repair_started_at?: string;
+  resolved_at?: string;
+  verified_at?: string;
+  repair_notes?: string;
+  progress_updates?: RepairProgressUpdate[];
+  resolution?: IncidentResolutionSubmission;
+  resolution_submission?: IncidentResolutionSubmission;
+  verification?: IncidentVerificationDetails;
+  verification_details?: any;
+
+  // Audit History
+  history?: AssignmentHistoryEntry[];
+
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface TechnicianRecommendationResult {
+  recommended_technician: TechnicianProfile;
+  match_score?: number;
+  recommended_percentage?: number;
+  reasoning?: string;
+  match_reasons?: string[];
+  required_specialisation?: string;
+  required_skills?: string[];
+  recommended_tools?: string[];
+  required_tools?: string[];
+  recommended_spare_parts?: any[];
+  suggested_spare_parts?: any[];
+  estimated_hours?: number;
+  estimated_repair_hours?: number;
+  recommended_resolution?: string;
+  alternative_technicians?: Array<{
+    technician: TechnicianProfile;
+    match_score?: number;
+    match_percentage?: number;
+    match_reasons?: string[];
+  }>;
+  all_candidates?: Array<{
+    technician: TechnicianProfile;
+    match_score?: number;
+    match_percentage?: number;
+    match_reasons?: string[];
+  }>;
+}
+
+

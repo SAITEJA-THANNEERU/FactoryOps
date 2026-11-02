@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Machine, ProductionRecord, Incident, WorkOrder, MaintenanceRecord, FactoryKPIs } from '../../types/index.ts';
 import {
   formatPowerBiNumber,
@@ -27,7 +27,29 @@ import {
   Cell,
   Legend
 } from 'recharts';
-import { AlertTriangle, Wrench, BarChart2, Settings, Clock, Target } from 'lucide-react';
+import {
+  AlertTriangle,
+  Wrench,
+  BarChart2,
+  Settings,
+  Clock,
+  Target,
+  Sparkles,
+  Users,
+  CheckCircle2,
+  ShieldCheck,
+  RotateCcw,
+  XCircle,
+  Layers,
+  Star,
+  ChevronRight,
+  UserCheck,
+  ArrowRight,
+  ExternalLink
+} from 'lucide-react';
+import { useData } from '../../contexts/DataContext.tsx';
+import { ManagerAssignmentDashboard } from '../technician/ManagerAssignmentDashboard.tsx';
+import type { TechnicianIncidentAssignment, TechnicianProfile } from '../../types/index.ts';
 
 interface ManagerDashboardViewProps {
   machines: Machine[];
@@ -50,6 +72,16 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
   onOpenIncidentModal,
   onOpenWorkOrderModal
 }) => {
+  const {
+    technicianProfiles,
+    technicianAssignments,
+    assignTechnicianToIncident,
+    verifyAssignment,
+    reviewAssignmentReassignment,
+    refreshData,
+    isLoading
+  } = useData();
+
   const [productionTimeframe, setProductionTimeframe] = useState<'all' | 'last7' | 'last30' | 'last90' | 'jul' | 'aug' | 'sep'>('all');
 
   // Top KPIs computed from actual operational records
@@ -329,6 +361,21 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
           iconBg="bg-purple-50 border-purple-100/80"
         />
       </div>
+
+      {/* ========================================================================= */}
+      {/* SECTION: MANAGER-CONTROLLED TECHNICIAN INCIDENT ASSIGNMENT & RESOLUTION SYSTEM */}
+      {/* ========================================================================= */}
+      <ManagerAssignmentDashboard
+        incidents={incidents}
+        machines={machines}
+        technicians={technicianProfiles}
+        assignments={technicianAssignments}
+        onAssignSubmit={assignTechnicianToIncident}
+        onVerifySubmit={verifyAssignment}
+        onReviewReassignment={reviewAssignmentReassignment}
+        onRefresh={refreshData}
+        isLoading={isLoading}
+      />
 
       {/* Middle Row (3 Visuals) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">

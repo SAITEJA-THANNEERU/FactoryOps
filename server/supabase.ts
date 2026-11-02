@@ -14,7 +14,12 @@ import type {
   FactoryKPIs,
   SuperAdminOverview,
   SparePart,
-  SystemAuditLog
+  SystemAuditLog,
+  TechnicianProfile,
+  TechnicianIncidentAssignment,
+  RepairProgressUpdate,
+  IncidentResolutionSubmission,
+  IncidentVerificationDetails
 } from '../src/types/index.ts';
 
 dotenv.config({ override: true });
@@ -1508,6 +1513,400 @@ export const supabaseAdapter = {
     db.users = db.users.filter(u => u.id !== id);
     db.persist();
     return { success: true, syncedToSupabase, supabaseError };
+  },
+
+  // ==========================================
+  // TECHNICIAN PROFILES & ASSIGNMENTS (SUPABASE INTEGRATION)
+  // ==========================================
+
+  async getTechnicianProfiles(factoryId = 'FAC-001'): Promise<TechnicianProfile[]> {
+    try {
+      // 1. Try querying remote public.technician_profiles table
+      const { data, error } = await supabase
+        .from('technician_profiles')
+        .select('*')
+        .or(`assigned_factory_id.eq.${factoryId},assigned_factory_id.is.null`);
+
+      if (!error && data && data.length > 0) {
+        return data as TechnicianProfile[];
+      }
+    } catch (err: any) {
+      console.warn('[Supabase] technician_profiles query error:', err?.message);
+    }
+
+    // 2. Query Supabase users table for technicians and build enriched profiles
+    try {
+      const { data: dbUsers, error: userErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'TECHNICIAN');
+
+      if (!userErr && dbUsers && dbUsers.length > 0) {
+        // Compute active assignments from Supabase work_orders
+        const { data: openWos } = await supabase
+          .from('work_orders')
+          .select('technician_id, assigned_to, status')
+          .neq('status', 'Completed')
+          .neq('status', 'Closed');
+
+        const activeCountByTech = new Map<string, number>();
+        (openWos || []).forEach(w => {
+          if (w.technician_id) activeCountByTech.set(w.technician_id, (activeCountByTech.get(w.technician_id) || 0) + 1);
+          if (w.assigned_to) activeCountByTech.set(w.assigned_to, (activeCountByTech.get(w.assigned_to) || 0) + 1);
+        });
+
+        // Map seed/in-memory technician details to Supabase users
+        const profiles: TechnicianProfile[] = dbUsers.map(u => {
+          const seed = db.technicianProfiles.find(p => p.user_id === u.id || p.email === u.email);
+          const activeCount = (activeCountByTech.get(u.id) || 0) + (activeCountByTech.get(u.name) || 0);
+
+          return {
+            id: seed?.id || `TECH-${u.id.replace('USR-', '')}`,
+            user_id: u.id,
+            name: u.name,
+            email: u.email,
+            specialisation: seed?.specialisation || 'Mechanical Technician',
+            secondary_specialisations: seed?.secondary_specialisations || ['CNC Technician'],
+            technical_skills: seed?.technical_skills || ['Spindle Alignment', 'Bearing Replacement', 'Vibration Analysis'],
+            experience_years: seed?.experience_years || 8,
+            assigned_factory_id: u.factory_id || factoryId,
+            assigned_factory_name: u.factory_name || 'Apex Precision Manufacturing',
+            availability_status: activeCount >= (seed?.max_concurrent_assignments || 3) ? 'BUSY' : 'AVAILABLE',
+            current_workload: activeCount,
+            active_assignments_count: activeCount,
+            max_concurrent_assignments: seed?.max_concurrent_assignments || 3,
+            certifications: seed?.certifications || ['Certified Maintenance Specialist'],
+            shift: seed?.shift || 'General (09:00 - 17:30)',
+            phone: seed?.phone || '+91 98490 12000',
+            rating: seed?.rating || 4.85,
+            completed_repairs_count: seed?.completed_repairs_count || 50,
+            created_at: u.created_at || new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        });
+
+        return profiles;
+      }
+    } catch (err: any) {
+      console.warn('[Supabase] Failed to fetch technicians from users table:', err?.message);
+    }
+
+    return db.getTechnicianProfiles(factoryId);
+  },
+
+  async getTechnicianAssignments(filter?: {
+    technician_id?: string;
+    technician_ids?: string[];
+    email?: string;
+    factory_id?: string;
+    status?: string;
+  }): Promise<TechnicianIncidentAssignment[]> {
+    let assignments: TechnicianIncidentAssignment[] = [];
+    const now = Date.now();
+
+    try {
+      // 1. Try querying remote public.technician_incident_assignments table
+      let query = supabase.from('technician_incident_assignments').select('*').order('created_at', { ascending: false });
+      if (filter?.factory_id) query = query.eq('factory_id', filter.factory_id);
+      if (filter?.technician_id) query = query.eq('technician_id', filter.technician_id);
+      if (filter?.technician_ids && filter.technician_ids.length > 0) {
+        query = query.in('technician_id', filter.technician_ids);
+      }
+      if (filter?.status && filter.status !== 'ALL') {
+        query = query.eq('status', filter.status);
+      }
+
+      const { data, error } = await query;
+      if (!error && data && data.length > 0) {
+        assignments = data.map((item: any) => {
+          const isPastDue = item.due_date ? new Date(item.due_date).getTime() < now : false;
+          const isCompleted = item.status === 'VERIFIED' || item.status === 'CLOSED';
+          return {
+            ...item,
+            is_overdue: isPastDue && !isCompleted
+          } as TechnicianIncidentAssignment;
+        });
+        return assignments;
+      }
+    } catch (err: any) {
+      console.warn('[Supabase] technician_incident_assignments table query failed:', err?.message);
+    }
+
+    // 2. Read from in-memory / persistent db
+    assignments = db.getTechnicianAssignments({
+      factory_id: filter?.factory_id,
+      status: filter?.status
+    });
+
+    // Apply technician filtering
+    if (filter?.technician_id || filter?.technician_ids || filter?.email) {
+      assignments = assignments.filter(a => {
+        if (filter.technician_id && a.technician_id === filter.technician_id) return true;
+        if (filter.technician_ids && filter.technician_ids.includes(a.technician_id)) return true;
+        if (filter.email && a.technician_email?.toLowerCase() === filter.email.toLowerCase()) return true;
+        return false;
+      });
+    }
+
+    // Refresh dynamic overdue status
+    return assignments.map(item => {
+      const isPastDue = item.due_date ? new Date(item.due_date).getTime() < now : false;
+      const isCompleted = item.status === 'VERIFIED' || item.status === 'CLOSED';
+      return {
+        ...item,
+        is_overdue: isPastDue && !isCompleted
+      };
+    });
+  },
+
+  async getTechnicianAssignment(id: string): Promise<TechnicianIncidentAssignment | undefined> {
+    try {
+      const { data, error } = await supabase
+        .from('technician_incident_assignments')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (!error && data) {
+        const now = Date.now();
+        const isPastDue = data.due_date ? new Date(data.due_date).getTime() < now : false;
+        const isCompleted = data.status === 'VERIFIED' || data.status === 'CLOSED';
+        return {
+          ...data,
+          is_overdue: isPastDue && !isCompleted
+        } as TechnicianIncidentAssignment;
+      }
+    } catch {
+      // Fall through to memory
+    }
+
+    return db.getTechnicianAssignment(id);
+  },
+
+  async createTechnicianAssignment(data: Partial<TechnicianIncidentAssignment>): Promise<TechnicianIncidentAssignment> {
+    const newId = data.id || `ASN-2026-${Date.now().toString().slice(-5)}`;
+    const nowIso = new Date().toISOString();
+
+    const assignment: TechnicianIncidentAssignment = {
+      id: newId,
+      incident_id: data.incident_id || 'INC-0001',
+      incident_title: data.incident_title || 'Equipment Maintenance Assignment',
+      incident_description: data.incident_description || '',
+      machine_id: data.machine_id || 'M001',
+      machine_name: data.machine_name || 'Industrial Asset',
+      machine_code: data.machine_code,
+      machine_location: data.machine_location,
+      factory_id: data.factory_id || 'FAC-001',
+      factory_name: data.factory_name || 'Apex Precision Manufacturing',
+      technician_id: data.technician_id || 'USR-012',
+      technician_name: data.technician_name || 'Ramesh Varma',
+      technician_email: data.technician_email || 'technician@factoryops.com',
+      technician_specialisation: data.technician_specialisation || 'Mechanical Technician',
+      status: 'PENDING ACCEPTANCE',
+      priority: data.priority || 'High',
+      assigned_date: nowIso,
+      due_date: data.due_date || new Date(Date.now() + 48 * 3600000).toISOString(),
+      is_overdue: false,
+      assigned_by_id: data.assigned_by_id || 'USR-007',
+      assigned_by_name: data.assigned_by_name || 'Manager',
+      assigned_by_role: data.assigned_by_role || 'MANAGER_SUPERVISOR',
+      repair_progress_percent: 0,
+      identified_issue: data.identified_issue || data.incident_title,
+      root_cause_analysis: data.root_cause_analysis,
+      recommended_resolution: data.recommended_resolution,
+      required_tools: data.required_tools || [],
+      spare_parts_required: data.spare_parts_required || [],
+      estimated_repair_hours: data.estimated_repair_hours || 2.5,
+      ai_recommendation_details: data.ai_recommendation_details,
+      progress_updates: [],
+      history: [
+        {
+          timestamp: nowIso,
+          action: 'ASSIGNED',
+          performed_by_id: data.assigned_by_id || 'USR-007',
+          performed_by_name: data.assigned_by_name || 'Manager',
+          performed_by_role: data.assigned_by_role || 'MANAGER_SUPERVISOR',
+          notes: 'Incident assigned to technician'
+        }
+      ],
+      created_at: nowIso,
+      updated_at: nowIso
+    };
+
+    // 1. Sync to Supabase technician_incident_assignments
+    try {
+      await supabase.from('technician_incident_assignments').upsert(assignment, { onConflict: 'id' });
+    } catch (e: any) {
+      console.warn('[Supabase] Could not insert to technician_incident_assignments:', e?.message);
+    }
+
+    // 2. Synchronize with Supabase native work_orders table
+    try {
+      const woPayload = {
+        id: `WO-${newId.replace('ASN-', '')}`,
+        work_order_id: `WO-${newId.replace('ASN-', '')}`,
+        factory_id: assignment.factory_id,
+        incident_id: assignment.incident_id,
+        machine_id: assignment.machine_id,
+        machine_name: assignment.machine_name,
+        line_id: 'L01',
+        line_name: 'Apex Line 1',
+        work_order_type: 'Corrective',
+        priority: assignment.priority,
+        status: 'Pending',
+        title: assignment.incident_title,
+        problem_description: assignment.identified_issue || assignment.incident_title,
+        technician_id: assignment.technician_id,
+        technician_name: assignment.technician_name,
+        assigned_to: assignment.technician_name,
+        creation_timestamp: nowIso.replace('T', ' ').slice(0, 19),
+        created_at: nowIso,
+        due_date: assignment.due_date.split('T')[0],
+        labor_hours: assignment.estimated_repair_hours,
+        estimated_hours: assignment.estimated_repair_hours
+      };
+      await supabase.from('work_orders').upsert(woPayload, { onConflict: 'id' });
+    } catch (e: any) {
+      console.warn('[Supabase] Could not sync work order for assignment:', e?.message);
+    }
+
+    // 3. Update Supabase incidents status & technician
+    try {
+      await supabase
+        .from('incidents')
+        .update({
+          status: 'Investigating',
+          technician_id: assignment.technician_id,
+          technician_name: assignment.technician_name
+        })
+        .or(`id.eq.${assignment.incident_id},incident_id.eq.${assignment.incident_id}`);
+    } catch (e: any) {
+      console.warn('[Supabase] Could not update incident for assignment:', e?.message);
+    }
+
+    // 4. Log to Supabase system_audit_logs
+    try {
+      await this.createSystemAuditLog({
+        factory_id: assignment.factory_id,
+        user_id: assignment.assigned_by_id,
+        user_name: assignment.assigned_by_name,
+        user_role: assignment.assigned_by_role || 'MANAGER_SUPERVISOR',
+        user_email: db.users.find(u => u.id === assignment.assigned_by_id)?.email || 'manager@factoryops.com',
+        action: 'ASSIGN_TECHNICIAN',
+        entity_type: 'IncidentAssignment',
+        entity_id: assignment.id,
+        details: `Assigned incident ${assignment.incident_id} to ${assignment.technician_name} (${assignment.technician_specialisation})`
+      });
+    } catch (e: any) {
+      console.warn('[Supabase] Could not log assignment audit event:', e?.message);
+    }
+
+    // Keep memory in sync
+    db.technicianAssignments.unshift(assignment);
+    const tech = db.technicianProfiles.find(p => p.user_id === assignment.technician_id || p.id === assignment.technician_id);
+    if (tech) {
+      tech.current_workload = (tech.current_workload || 0) + 1;
+      tech.active_assignments_count = (tech.active_assignments_count || 0) + 1;
+      if (tech.current_workload >= (tech.max_concurrent_assignments || 3)) {
+        tech.availability_status = 'BUSY';
+      }
+    }
+
+    return assignment;
+  },
+
+  async updateTechnicianAssignment(id: string, updates: Partial<TechnicianIncidentAssignment>): Promise<TechnicianIncidentAssignment | undefined> {
+    const existing = await this.getTechnicianAssignment(id);
+    if (!existing) return undefined;
+
+    const merged: TechnicianIncidentAssignment = {
+      ...existing,
+      ...updates,
+      updated_at: new Date().toISOString()
+    };
+
+    // 1. Update Supabase technician_incident_assignments
+    try {
+      await supabase
+        .from('technician_incident_assignments')
+        .update(merged)
+        .eq('id', id);
+    } catch (e: any) {
+      console.warn('[Supabase] Could not update technician_incident_assignments:', e?.message);
+    }
+
+    // 2. Synchronize to Supabase work_orders
+    try {
+      const woStatus = merged.status === 'RESOLVED_PENDING_VERIFICATION' || merged.status === 'VERIFIED' || merged.status === 'CLOSED'
+        ? 'Completed'
+        : merged.status === 'IN PROGRESS'
+          ? 'In Progress'
+          : 'Pending';
+
+      const woUpdates: any = { status: woStatus };
+      if (merged.resolved_at) {
+        woUpdates.completed_at = merged.resolved_at;
+        woUpdates.end_time = merged.resolved_at;
+      }
+      if (merged.resolution_submission) {
+        woUpdates.root_cause = merged.resolution_submission.confirmed_root_cause;
+        woUpdates.action_taken = merged.resolution_submission.actions_taken;
+        woUpdates.labor_hours = merged.resolution_submission.actual_repair_hours;
+        woUpdates.actual_hours = merged.resolution_submission.actual_repair_hours;
+      }
+
+      await supabase
+        .from('work_orders')
+        .update(woUpdates)
+        .or(`incident_id.eq.${merged.incident_id},work_order_id.eq.WO-${merged.id.replace('ASN-', '')}`);
+    } catch (e: any) {
+      console.warn('[Supabase] Could not update linked work order:', e?.message);
+    }
+
+    // 3. Synchronize to Supabase incidents if resolved or verified
+    try {
+      if (merged.status === 'VERIFIED' || merged.status === 'CLOSED') {
+        await supabase
+          .from('incidents')
+          .update({
+            status: 'Closed',
+            resolved_at: merged.resolved_at || new Date().toISOString(),
+            resolution_notes: merged.resolution_submission?.actions_taken || 'Repaired and verified by engineering'
+          })
+          .or(`id.eq.${merged.incident_id},incident_id.eq.${merged.incident_id}`);
+      } else if (merged.status === 'RESOLVED_PENDING_VERIFICATION') {
+        await supabase
+          .from('incidents')
+          .update({
+            status: 'Investigating',
+            resolution_notes: merged.resolution_submission?.actions_taken || 'Repair completed, awaiting manager verification'
+          })
+          .or(`id.eq.${merged.incident_id},incident_id.eq.${merged.incident_id}`);
+      }
+    } catch (e: any) {
+      console.warn('[Supabase] Could not update linked incident:', e?.message);
+    }
+
+    // Keep memory in sync
+    return db.updateTechnicianAssignment(id, updates);
+  },
+
+  // AI Recommendation Engine grounded on Supabase incidents and technician roster
+  async recommendTechnicianForIncident(incidentId: string) {
+    let incident = db.incidents.find(i => i.id === incidentId || i.incident_id === incidentId);
+    let machine = incident && incident.machine_id ? db.machines.find(m => m.id === incident!.machine_id || m.machine_id === incident!.machine_id) : undefined;
+
+    // Check remote Supabase if not in memory
+    if (!incident) {
+      try {
+        const { data } = await supabase.from('incidents').select('*').or(`id.eq.${incidentId},incident_id.eq.${incidentId}`).maybeSingle();
+        if (data) incident = normalizeIncident(data);
+      } catch {
+        // Continue
+      }
+    }
+
+    return db.recommendTechnicianForIncident(incidentId);
   },
 
   // Synchronize entire persistent store to remote Supabase database

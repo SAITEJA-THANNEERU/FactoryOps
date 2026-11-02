@@ -7,7 +7,9 @@ import type {
   WorkOrder,
   SOP,
   DataQualityMetric,
-  FactoryKPIs
+  FactoryKPIs,
+  TechnicianProfile,
+  TechnicianIncidentAssignment
 } from '../types/index.ts';
 import { api } from '../services/api.ts';
 import { useAuth } from './AuthContext.tsx';
@@ -33,11 +35,15 @@ interface DataContextType {
   sops: SOP[];
   dataQuality: DataQualityMetric[];
   kpis: FactoryKPIs | null;
+  technicianProfiles: TechnicianProfile[];
+  technicianAssignments: TechnicianIncidentAssignment[];
   notifications: OperationalNotification[];
   unreadNotificationsCount: number;
   isLoading: boolean;
   error: string | null;
   refreshData: () => Promise<void>;
+  refreshTechnicians: () => Promise<void>;
+  refreshTechnicianAssignments: (status?: string) => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
   clearAllNotifications: () => void;
@@ -64,6 +70,15 @@ interface DataContextType {
   createMaintenanceRecord: (data: Partial<MaintenanceRecord>) => Promise<MaintenanceRecord>;
   deleteMaintenanceRecord: (id: string) => Promise<boolean>;
   syncSupabase: () => Promise<{ success: boolean; message: string; details?: any }>;
+  assignTechnicianToIncident: (data: Partial<TechnicianIncidentAssignment>) => Promise<TechnicianIncidentAssignment>;
+  acceptTechnicianAssignment: (id: string, notes?: string) => Promise<TechnicianIncidentAssignment>;
+  rejectTechnicianAssignment: (id: string, rejectionReason: string) => Promise<TechnicianIncidentAssignment>;
+  requestAssignmentReassignment: (id: string, reassignmentReason: string) => Promise<TechnicianIncidentAssignment>;
+  reviewAssignmentReassignment: (id: string, payload: { decision: 'APPROVE' | 'REJECT'; new_technician_id?: string; manager_notes?: string }) => Promise<TechnicianIncidentAssignment>;
+  startAssignmentRepair: (id: string, notes?: string) => Promise<TechnicianIncidentAssignment>;
+  updateAssignmentProgress: (id: string, payload: { progress_percent: number; diagnosis_notes: string; additional_problems_found?: string }) => Promise<TechnicianIncidentAssignment>;
+  resolveAssignment: (id: string, payload: { confirmed_root_cause: string; actions_taken: string; parts_used?: any[]; actual_repair_hours: number; resolution_remarks?: string }) => Promise<TechnicianIncidentAssignment>;
+  verifyAssignment: (id: string, payload: { decision: 'APPROVE' | 'REJECT'; verification_notes?: string; quality_rating?: number; rework_instructions?: string }) => Promise<TechnicianIncidentAssignment>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -79,6 +94,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [sops, setSops] = useState<SOP[]>([]);
   const [dataQuality, setDataQuality] = useState<DataQualityMetric[]>([]);
   const [kpis, setKpis] = useState<FactoryKPIs | null>(null);
+  const [technicianProfiles, setTechnicianProfiles] = useState<TechnicianProfile[]>([]);
+  const [technicianAssignments, setTechnicianAssignments] = useState<TechnicianIncidentAssignment[]>([]);
   const [readNotificationIds, setReadNotificationIds] = useState<Set<string>>(() => {
     try {
       const stored = localStorage.getItem('factoryops_read_notifications');
@@ -98,6 +115,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshTechnicians = useCallback(async () => {
+    try {
+      const data = await api.technicians.getAll();
+      setTechnicianProfiles(data);
+    } catch (err) {
+      console.warn('Failed to load technician profiles:', err);
+    }
+  }, []);
+
+  const refreshTechnicianAssignments = useCallback(async (status?: string) => {
+    try {
+      const data = await api.technicianAssignments.getAll(status);
+      setTechnicianAssignments(data);
+    } catch (err) {
+      console.warn('Failed to load technician assignments:', err);
+    }
+  }, []);
+
   const refreshData = useCallback(async () => {
     if (!isAuthenticated) {
       setMachines([]);
@@ -108,6 +143,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSops([]);
       setDataQuality([]);
       setKpis(null);
+      setTechnicianProfiles([]);
+      setTechnicianAssignments([]);
       return;
     }
 
@@ -127,7 +164,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sopsData,
         dataQualityData,
         kpiData,
-        notificationsData
+        notificationsData,
+        techsData,
+        assignmentsData
       ] = await Promise.all([
         api.machines.getAll(factoryId),
         api.production.getAll(factoryId),
@@ -137,7 +176,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         api.sops.getAll(factoryId),
         api.dataQuality.getAll(factoryId),
         api.factories.getStats(factoryId),
-        api.notifications.getAll().catch(() => null)
+        api.notifications.getAll().catch(() => null),
+        api.technicians.getAll().catch(() => []),
+        api.technicianAssignments.getAll().catch(() => [])
       ]);
 
       setMachines(machinesData);
@@ -148,6 +189,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSops(sopsData);
       setDataQuality(dataQualityData);
       setKpis(kpiData);
+      setTechnicianProfiles(techsData || []);
+      setTechnicianAssignments(assignmentsData || []);
 
       if (notificationsData?.readIds) {
         setReadNotificationIds(prev => {
@@ -486,6 +529,65 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, [notifications]);
 
+  const assignTechnicianToIncident = useCallback(async (data: Partial<TechnicianIncidentAssignment>) => {
+    const res = await api.technicianAssignments.assign(data);
+    await refreshTechnicianAssignments();
+    await refreshTechnicians();
+    return res;
+  }, [refreshTechnicianAssignments, refreshTechnicians]);
+
+  const acceptTechnicianAssignment = useCallback(async (id: string, notes?: string) => {
+    const res = await api.technicianAssignments.accept(id, notes);
+    await refreshTechnicianAssignments();
+    return res;
+  }, [refreshTechnicianAssignments]);
+
+  const rejectTechnicianAssignment = useCallback(async (id: string, rejectionReason: string) => {
+    const res = await api.technicianAssignments.reject(id, rejectionReason);
+    await refreshTechnicianAssignments();
+    await refreshTechnicians();
+    return res;
+  }, [refreshTechnicianAssignments, refreshTechnicians]);
+
+  const requestAssignmentReassignment = useCallback(async (id: string, reassignmentReason: string) => {
+    const res = await api.technicianAssignments.requestReassignment(id, reassignmentReason);
+    await refreshTechnicianAssignments();
+    return res;
+  }, [refreshTechnicianAssignments]);
+
+  const reviewAssignmentReassignment = useCallback(async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; new_technician_id?: string; manager_notes?: string }) => {
+    const res = await api.technicianAssignments.reviewReassignment(id, payload);
+    await refreshTechnicianAssignments();
+    await refreshTechnicians();
+    return res;
+  }, [refreshTechnicianAssignments, refreshTechnicians]);
+
+  const startAssignmentRepair = useCallback(async (id: string, notes?: string) => {
+    const res = await api.technicianAssignments.startRepair(id, notes);
+    await refreshTechnicianAssignments();
+    return res;
+  }, [refreshTechnicianAssignments]);
+
+  const updateAssignmentProgress = useCallback(async (id: string, payload: { progress_percent: number; diagnosis_notes: string; additional_problems_found?: string }) => {
+    const res = await api.technicianAssignments.progressUpdate(id, payload);
+    await refreshTechnicianAssignments();
+    return res;
+  }, [refreshTechnicianAssignments]);
+
+  const resolveAssignment = useCallback(async (id: string, payload: { confirmed_root_cause: string; actions_taken: string; parts_used?: any[]; actual_repair_hours: number; resolution_remarks?: string }) => {
+    const res = await api.technicianAssignments.resolve(id, payload);
+    await refreshTechnicianAssignments();
+    return res;
+  }, [refreshTechnicianAssignments]);
+
+  const verifyAssignment = useCallback(async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; verification_notes?: string; quality_rating?: number; rework_instructions?: string }) => {
+    const res = await api.technicianAssignments.verify(id, payload);
+    await refreshTechnicianAssignments();
+    await refreshTechnicians();
+    await refreshData();
+    return res;
+  }, [refreshTechnicianAssignments, refreshTechnicians, refreshData]);
+
   return (
     <DataContext.Provider
       value={{
@@ -497,11 +599,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         sops,
         dataQuality,
         kpis,
+        technicianProfiles,
+        technicianAssignments,
         notifications,
         unreadNotificationsCount,
         isLoading,
         error,
         refreshData,
+        refreshTechnicians,
+        refreshTechnicianAssignments,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         clearAllNotifications,
@@ -519,7 +625,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteProductionRecord,
         createMaintenanceRecord,
         deleteMaintenanceRecord,
-        syncSupabase
+        syncSupabase,
+        assignTechnicianToIncident,
+        acceptTechnicianAssignment,
+        rejectTechnicianAssignment,
+        requestAssignmentReassignment,
+        reviewAssignmentReassignment,
+        startAssignmentRepair,
+        updateAssignmentProgress,
+        resolveAssignment,
+        verifyAssignment
       }}
     >
       {children}

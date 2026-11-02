@@ -253,6 +253,42 @@
       "factory_name": "Apex Precision Manufacturing",
       "status": "active",
       "created_at": "2026-10-29T10:34:00.318Z"
+    },
+    {
+      "id": "USR-018",
+      "name": "Vikram Singh (Automation & Robotics Tech)",
+      "email": "tech.robotics@factoryops.com",
+      "password_hash": "8e4bff94d82460bb686bccd669f7d85c95043f782a4c7a44b01772d34527f749b1ca3dc2e42b62f368ef70a432780b64ff9d66b324ab47e601b4d158499d3cab",
+      "salt": "056285cac6f5ac1467682282207ce5d7",
+      "role": "TECHNICIAN",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "status": "active",
+      "created_at": "2026-11-02T12:10:52.458Z"
+    },
+    {
+      "id": "USR-019",
+      "name": "Rajesh Menon (Hydraulics & Pneumatics Tech)",
+      "email": "tech.hydraulics@factoryops.com",
+      "password_hash": "34dc350442a37902e6a59f90b4d5bf8406e9eeeb4346fbd9aa0cf6a52e0864ae9ce684d38811fbc5e8cd37fbbae5728909d9a2cbd6aaa67d575f91dcf56f3e63",
+      "salt": "b3c798acba85f7507461d209abcb05c2",
+      "role": "TECHNICIAN",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "status": "active",
+      "created_at": "2026-11-02T12:10:52.459Z"
+    },
+    {
+      "id": "USR-020",
+      "name": "Sunita Rao (Instrumentation & Controls Tech)",
+      "email": "tech.instruments@factoryops.com",
+      "password_hash": "dd52d528b5d902506b3e88f21fa82a2f653928253fae15cf0173abb7a7e41c0715c9623fbffcd160156bf6f946adbf22af66e48bbe1ed408a1d3309d23ed9fc2",
+      "salt": "d68bacf4a5f80909ad407d937cc2a9ec",
+      "role": "TECHNICIAN",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "status": "active",
+      "created_at": "2026-11-02T12:10:52.460Z"
     }
   ],
   "machines": [
@@ -231763,7 +231799,8 @@
       "failure_category": "Tooling",
       "root_cause": "High abrasive casting hardness",
       "action_taken": "Replaced face mill carbide inserts and adjusted feed",
-      "remarks": "Roughness within tolerance"
+      "remarks": "Roughness within tolerance",
+      "resolution": "Replaced bearing SKF-7014-ACD, dynamic balancing performed, 30 min run at 12000 RPM passed."
     },
     {
       "id": "INC-0051",
@@ -238412,5 +238449,921 @@
       "created_at": "2026-08-01T08:00:00Z"
     }
   ],
-  "systemAuditLogs": []
+  "systemAuditLogs": [
+    {
+      "id": "LOG-1793625710831-637",
+      "factory_id": "FAC-001",
+      "user_id": "USR-007",
+      "user_name": "Amit Deshmukh (Manager/Supervisor)",
+      "user_role": "MANAGER_SUPERVISOR",
+      "user_email": "manager.apex@factoryops.com",
+      "action": "ASSIGN_TECHNICIAN",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-10174",
+      "details": "Assigned incident INC-0013 to Vikram Singh (Robotics Specialist) (Automation & Robotics Technician)",
+      "timestamp": "2026-11-02T13:21:50.831Z"
+    },
+    {
+      "id": "LOG-1793625710624-855",
+      "factory_id": "FAC-001",
+      "user_id": "USR-007",
+      "user_name": "Amit Deshmukh (Manager/Supervisor)",
+      "user_role": "MANAGER_SUPERVISOR",
+      "action": "ASSIGN_TECHNICIAN",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-10174",
+      "details": "Assigned incident INC-0013 to Vikram Singh (Robotics Specialist) (Automation & Robotics Technician)",
+      "timestamp": "2026-11-02T13:21:50.624Z"
+    },
+    {
+      "id": "LOG-1793625709565-31",
+      "factory_id": "FAC-001",
+      "user_id": "USR-007",
+      "user_name": "Amit Deshmukh (Manager/Supervisor)",
+      "user_role": "MANAGER_SUPERVISOR",
+      "user_email": "manager.apex@factoryops.com",
+      "action": "VERIFY_RESOLUTION",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-005",
+      "details": "Manager Amit Deshmukh (Manager/Supervisor) approved resolution for assignment ASN-2026-005",
+      "timestamp": "2026-11-02T13:21:49.565Z"
+    },
+    {
+      "id": "LOG-1793625708399-635",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "RESOLVE_ASSIGNMENT",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-005",
+      "details": "Technician Ramesh Varma (Senior Technician) submitted repair resolution for Apex 5-Axis CNC Machining Center 01 (1.2 hrs)",
+      "timestamp": "2026-11-02T13:21:48.399Z"
+    },
+    {
+      "id": "LOG-1793625707096-645",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "UPDATE_REPAIR_PROGRESS",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-005",
+      "details": "Repair progress on Apex 5-Axis CNC Machining Center 01: 60%",
+      "timestamp": "2026-11-02T13:21:47.096Z"
+    },
+    {
+      "id": "LOG-1793625705838-874",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "START_REPAIR",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-005",
+      "details": "Technician Ramesh Varma (Senior Technician) started repair on Apex 5-Axis CNC Machining Center 01",
+      "timestamp": "2026-11-02T13:21:45.838Z"
+    },
+    {
+      "id": "LOG-1793625704723-321",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "ACCEPT_ASSIGNMENT",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-005",
+      "details": "Technician Ramesh Varma (Senior Technician) accepted assignment ASN-2026-005",
+      "timestamp": "2026-11-02T13:21:44.723Z"
+    },
+    {
+      "id": "LOG-1793621486924-208",
+      "factory_id": "FAC-001",
+      "user_id": "USR-007",
+      "user_name": "Amit Deshmukh (Manager/Supervisor)",
+      "user_role": "MANAGER_SUPERVISOR",
+      "user_email": "manager.apex@factoryops.com",
+      "action": "VERIFY_RESOLUTION",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-001",
+      "details": "Manager Amit Deshmukh (Manager/Supervisor) approved resolution for assignment ASN-2026-001",
+      "timestamp": "2026-11-02T12:11:26.924Z"
+    },
+    {
+      "id": "LOG-1793621486543-872",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "RESOLVE_ASSIGNMENT",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-001",
+      "details": "Technician Ramesh Varma (Senior Technician) submitted repair resolution for Apex 5-Axis CNC Machining Center 01 (3.2 hrs)",
+      "timestamp": "2026-11-02T12:11:26.543Z"
+    },
+    {
+      "id": "LOG-1793621485956-204",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "UPDATE_REPAIR_PROGRESS",
+      "entity_type": "IncidentAssignment",
+      "entity_id": "ASN-2026-001",
+      "details": "Repair progress on Apex 5-Axis CNC Machining Center 01: 75%",
+      "timestamp": "2026-11-02T12:11:25.956Z"
+    }
+  ],
+  "technicianProfiles": [
+    {
+      "id": "TECH-001",
+      "user_id": "USR-012",
+      "name": "Ramesh Varma",
+      "email": "tech.apex@factoryops.com",
+      "specialisation": "Mechanical Technician",
+      "secondary_specialisations": [
+        "CNC Technician"
+      ],
+      "technical_skills": [
+        "Spindle Alignment",
+        "Bearing Replacement",
+        "Vibration Analysis",
+        "Gearbox Overhaul",
+        "Precision Machining",
+        "Dial Indicator Calibration"
+      ],
+      "experience_years": 9,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "AVAILABLE",
+      "current_workload": 1,
+      "active_assignments_count": 1,
+      "max_concurrent_assignments": 3,
+      "certifications": [
+        "ISO 18436 Vibration Cat II",
+        "SKF Certified Maintenance Specialist"
+      ],
+      "shift": "Morning (06:00 - 14:00)",
+      "phone": "+91 98490 12012",
+      "rating": 4.9,
+      "completed_repairs_count": 87,
+      "created_at": "2024-01-10T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.532Z"
+    },
+    {
+      "id": "TECH-002",
+      "user_id": "USR-013",
+      "name": "Anil Sharma",
+      "email": "tech.nova@factoryops.com",
+      "specialisation": "Electrical Technician",
+      "secondary_specialisations": [
+        "Instrumentation Technician"
+      ],
+      "technical_skills": [
+        "PLC Diagnostics",
+        "VFD Configuration",
+        "Control Panel Wiring",
+        "Thermal Imaging",
+        "Power Distribution 415V",
+        "Relay Logic"
+      ],
+      "experience_years": 7,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "AVAILABLE",
+      "current_workload": 1,
+      "active_assignments_count": 1,
+      "max_concurrent_assignments": 3,
+      "certifications": [
+        "Certified Electrical Safety Worker (NFPA 70E)",
+        "Siemens S7-1200 Certified"
+      ],
+      "shift": "General (09:00 - 17:30)",
+      "phone": "+91 98490 12013",
+      "rating": 4.8,
+      "completed_repairs_count": 64,
+      "created_at": "2024-02-15T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.533Z"
+    },
+    {
+      "id": "TECH-003",
+      "user_id": "USR-014",
+      "name": "Praveen Nair",
+      "email": "tech.vertex@factoryops.com",
+      "specialisation": "CNC Technician",
+      "secondary_specialisations": [
+        "Mechanical Technician"
+      ],
+      "technical_skills": [
+        "Fanuc 31i Diagnostics",
+        "Ballscrew Backlash Calibration",
+        "Tool Changer Alignment",
+        "G-Code Optimization",
+        "Linear Guide Rail Replacement"
+      ],
+      "experience_years": 6,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "BUSY",
+      "current_workload": 2,
+      "active_assignments_count": 2,
+      "max_concurrent_assignments": 2,
+      "certifications": [
+        "Fanuc Certified Maintenance Specialist",
+        "Heidenhain Linear Encoders"
+      ],
+      "shift": "Afternoon (14:00 - 22:00)",
+      "phone": "+91 98490 12014",
+      "rating": 4.7,
+      "completed_repairs_count": 53,
+      "created_at": "2024-03-01T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.533Z"
+    },
+    {
+      "id": "TECH-004",
+      "user_id": "USR-018",
+      "name": "Vikram Singh",
+      "email": "tech.robotics@factoryops.com",
+      "specialisation": "Automation & Robotics Technician",
+      "secondary_specialisations": [
+        "Electrical Technician"
+      ],
+      "technical_skills": [
+        "KUKA KRC4 Programming",
+        "ABB IRC5 Calibration",
+        "EOAT Pneumatics",
+        "Safety Interlock Wiring",
+        "Servo Drive Tuning",
+        "Industrial Ethernet"
+      ],
+      "experience_years": 8,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "AVAILABLE",
+      "current_workload": 1,
+      "active_assignments_count": 1,
+      "max_concurrent_assignments": 3,
+      "certifications": [
+        "KUKA System Integrator Certified",
+        "FANUC Robotics Core Operations"
+      ],
+      "shift": "Morning (06:00 - 14:00)",
+      "phone": "+91 98490 12018",
+      "rating": 4.9,
+      "completed_repairs_count": 72,
+      "created_at": "2024-04-10T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.533Z"
+    },
+    {
+      "id": "TECH-005",
+      "user_id": "USR-019",
+      "name": "Rajesh Menon",
+      "email": "tech.hydraulics@factoryops.com",
+      "specialisation": "Hydraulic & Pneumatic Technician",
+      "secondary_specialisations": [
+        "Mechanical Technician"
+      ],
+      "technical_skills": [
+        "Proportional Valve Calibration",
+        "Accumulator Charging",
+        "High-Pressure Hose Crimp",
+        "Pneumatic Manifold Troubleshooting",
+        "Oil Contamination Testing",
+        "Hydrostatic Pressure Testing"
+      ],
+      "experience_years": 11,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "AVAILABLE",
+      "current_workload": 1,
+      "active_assignments_count": 1,
+      "max_concurrent_assignments": 3,
+      "certifications": [
+        "IFPS Certified Hydraulic Specialist",
+        "Parker Fluid Power Cert"
+      ],
+      "shift": "General (09:00 - 17:30)",
+      "phone": "+91 98490 12019",
+      "rating": 4.95,
+      "completed_repairs_count": 115,
+      "created_at": "2024-01-05T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.533Z"
+    },
+    {
+      "id": "TECH-006",
+      "user_id": "USR-020",
+      "name": "Sunita Rao",
+      "email": "tech.instruments@factoryops.com",
+      "specialisation": "Instrumentation Technician",
+      "secondary_specialisations": [
+        "Electrical Technician"
+      ],
+      "technical_skills": [
+        "4-20mA Loop Calibration",
+        "RTD & Thermocouple Verification",
+        "Flowmeter Tuning",
+        "SCADA I/O Mapping",
+        "Pressure Transmitter Calibration",
+        "PID Loop Tuning"
+      ],
+      "experience_years": 5,
+      "assigned_factory_id": "FAC-001",
+      "assigned_factory_name": "Apex Precision Manufacturing",
+      "availability_status": "AVAILABLE",
+      "current_workload": 0,
+      "active_assignments_count": 0,
+      "max_concurrent_assignments": 3,
+      "certifications": [
+        "ISA Certified Control Systems Technician (CCST)",
+        "Yokogawa Instrumentation"
+      ],
+      "shift": "General (09:00 - 17:30)",
+      "phone": "+91 98490 12020",
+      "rating": 4.85,
+      "completed_repairs_count": 48,
+      "created_at": "2024-05-12T08:00:00Z",
+      "updated_at": "2026-11-02T13:48:58.533Z"
+    }
+  ],
+  "technicianAssignments": [
+    {
+      "id": "ASN-2026-001",
+      "incident_id": "INC-0001",
+      "incident_title": "Spindle Bearing Thermal Runaway & Excessive Vibration",
+      "incident_description": "High frequency harmonic chatter and 4.8 mm/s RMS vibration detected on CNC Milling spindle axis.",
+      "machine_id": "M001",
+      "machine_name": "Apex 5-Axis CNC Machining Center 01",
+      "machine_code": "APX-CNC-01",
+      "machine_location": "Bay 1 - Heavy Machining",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-012",
+      "technician_name": "Ramesh Varma",
+      "technician_email": "tech.apex@factoryops.com",
+      "technician_specialisation": "Mechanical Technician",
+      "status": "VERIFIED",
+      "priority": "High",
+      "assigned_date": "2026-10-30T09:00:00Z",
+      "due_date": "2026-11-01T18:00:00Z",
+      "is_overdue": false,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "accepted_at": "2026-10-30T09:18:22Z",
+      "repair_started_at": "2026-10-30T10:15:00Z",
+      "repair_progress_percent": 100,
+      "repair_notes": "New ceramic bearing pressed into housing with arbor press.",
+      "identified_issue": "Excessive spindle bearing vibration and temperature rising above 78°C",
+      "root_cause_analysis": "High radial preload caused thermal breakdown of lubricant and micro-spalling on inner race",
+      "recommended_resolution": "Extract ceramic hybrid bearing set SKF-7014, check shaft runout, re-seat with precision spacer",
+      "required_tools": [
+        "Spindle Puller Set",
+        "Dial Test Indicator (0.001mm)",
+        "Torque Wrench 40Nm",
+        "Bearing Induction Heater"
+      ],
+      "spare_parts_required": [
+        {
+          "part_id": "PRT-1001",
+          "part_number": "SKF-7014-ACD",
+          "part_name": "Spindle High-Precision Ceramic Bearing",
+          "quantity": 2,
+          "is_in_stock": true,
+          "status": "Reserved"
+        }
+      ],
+      "estimated_repair_hours": 3.5,
+      "ai_recommendation_details": {
+        "match_score": 96,
+        "reasoning": "Ramesh Varma has 9 years of mechanical experience, ISO vibration certification, and direct spindle bearing expertise.",
+        "required_specialisation": "Mechanical Technician",
+        "matched_skills": [
+          "Spindle Alignment",
+          "Bearing Replacement",
+          "Vibration Analysis"
+        ]
+      },
+      "progress_updates": [
+        {
+          "id": "UPD-001",
+          "timestamp": "2026-10-30T10:30:00Z",
+          "progress_percent": 25,
+          "diagnosis_notes": "Spindle casing opened. Confirmed bearing race scoring.",
+          "additional_problems_found": "Minor lubrication line buildup cleared with solvent flush.",
+          "updated_by_id": "USR-012",
+          "updated_by_name": "Ramesh Varma"
+        },
+        {
+          "id": "UPD-002",
+          "timestamp": "2026-10-30T13:45:00Z",
+          "progress_percent": 50,
+          "diagnosis_notes": "Defective bearing extracted cleanly without shaft scoring. Preparing new bearing install.",
+          "updated_by_id": "USR-012",
+          "updated_by_name": "Ramesh Varma"
+        },
+        {
+          "id": "UPD-85916",
+          "timestamp": "2026-11-02T12:11:25.916Z",
+          "progress_percent": 75,
+          "diagnosis_notes": "New ceramic bearing pressed into housing with arbor press.",
+          "updated_by_id": "USR-012",
+          "updated_by_name": "Ramesh Varma (Senior Technician)"
+        }
+      ],
+      "history": [
+        {
+          "timestamp": "2026-10-30T09:00:00Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "AI recommendation approved by manager Amit Deshmukh."
+        },
+        {
+          "timestamp": "2026-10-30T09:18:22Z",
+          "action": "ACCEPTED",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Technician accepted assignment and scheduled bay arrival."
+        },
+        {
+          "timestamp": "2026-10-30T10:15:00Z",
+          "action": "STARTED_REPAIR",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "LOTO applied and repair initiated."
+        },
+        {
+          "timestamp": "2026-11-02T12:11:25.916Z",
+          "action": "PROGRESS_UPDATE",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Progress logged: 75%. Notes: New ceramic bearing pressed into housing with arbor press."
+        },
+        {
+          "timestamp": "2026-11-02T12:11:26.499Z",
+          "action": "MARKED_RESOLVED",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Repair finished in 3.2h and submitted for Manager verification."
+        },
+        {
+          "timestamp": "2026-11-02T12:11:26.849Z",
+          "action": "VERIFIED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh (Manager/Supervisor)",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Repair verified and approved by Amit Deshmukh (Manager/Supervisor). Quality Rating: 5/5"
+        },
+        {
+          "timestamp": "2026-11-02T12:11:26.849Z",
+          "action": "CLOSED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh (Manager/Supervisor)",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Incident lifecycle closed."
+        }
+      ],
+      "created_at": "2026-10-30T09:00:00Z",
+      "updated_at": "2026-11-02T12:11:26.849Z",
+      "resolved_at": "2026-11-02T12:11:26.499Z",
+      "resolution_submission": {
+        "confirmed_root_cause": "Thermal expansion induced micro-pitting in outer race",
+        "actions_taken": "Replaced bearing SKF-7014-ACD, dynamic balancing performed, 30 min run at 12000 RPM passed.",
+        "parts_used": [],
+        "actual_repair_hours": 3.2,
+        "resolution_remarks": "Vibration is now 0.8 mm/s RMS (well below 4.5 mm/s warning threshold).",
+        "submitted_at": "2026-11-02T12:11:26.499Z"
+      },
+      "verified_at": "2026-11-02T12:11:26.849Z",
+      "verification_details": {
+        "verified_by_id": "USR-007",
+        "verified_by_name": "Amit Deshmukh (Manager/Supervisor)",
+        "verified_by_role": "MANAGER_SUPERVISOR",
+        "verified_at": "2026-11-02T12:11:26.849Z",
+        "verification_notes": "On-site vibration spectrum inspected. Peak velocity is 0.8 mm/s. Machine cleared for production run.",
+        "quality_rating": 5
+      }
+    },
+    {
+      "id": "ASN-2026-002",
+      "incident_id": "INC-0073",
+      "incident_title": "Seal Micro-Extrusion & Hydraulic Tonnage Loss",
+      "incident_description": "Hydraulic ram cylinder oil weeping and pressure decay from 220 bar to 165 bar during full stroke clamping.",
+      "machine_id": "M007",
+      "machine_name": "Hydraulic Stamping Press 01",
+      "machine_code": "APX-PRS-01",
+      "machine_location": "Bay 3 - Stamping & Forming",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-019",
+      "technician_name": "Rajesh Menon",
+      "technician_email": "tech.hydraulics@factoryops.com",
+      "technician_specialisation": "Hydraulic & Pneumatic Technician",
+      "status": "RESOLVED_PENDING_VERIFICATION",
+      "priority": "High",
+      "assigned_date": "2026-10-29T10:00:00Z",
+      "due_date": "2026-10-30T18:00:00Z",
+      "is_overdue": false,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "accepted_at": "2026-10-29T10:12:00Z",
+      "repair_started_at": "2026-10-29T11:00:00Z",
+      "resolved_at": "2026-10-30T15:30:00Z",
+      "repair_progress_percent": 100,
+      "identified_issue": "Hydraulic ram oil seal degradation and pressure droop during 120-ton cycle",
+      "root_cause_analysis": "Thermal fatigue of primary polyurethane chevron seal due to contaminated fluid particulate spike",
+      "recommended_resolution": "Depressurize accumulator, replace valve block seal kit VTN-OR-K50, filter fluid, bleed air",
+      "required_tools": [
+        "Hydraulic Pressure Gauge Kit (0-400 Bar)",
+        "Spanner Set 32mm",
+        "Fluid Bleed Hose"
+      ],
+      "spare_parts_required": [
+        {
+          "part_id": "PRT-1002",
+          "part_number": "VTN-OR-K50",
+          "part_name": "Hydraulic Valve Block Viton O-Ring Seal Kit",
+          "quantity": 1,
+          "is_in_stock": true,
+          "status": "Used"
+        }
+      ],
+      "estimated_repair_hours": 4,
+      "ai_recommendation_details": {
+        "match_score": 98,
+        "reasoning": "Rajesh Menon has 11 years experience as IFPS certified fluid power specialist, perfect match for high pressure hydraulics.",
+        "required_specialisation": "Hydraulic & Pneumatic Technician",
+        "matched_skills": [
+          "Proportional Valve Calibration",
+          "High-Pressure Hose Crimp",
+          "Pneumatic Manifold Troubleshooting"
+        ]
+      },
+      "resolution_submission": {
+        "confirmed_root_cause": "Particulate contamination caused abrasion and micro-extrusion of main ram cylinder wiper seal and valve block O-ring.",
+        "actions_taken": "Replaced primary Viton O-ring seal kit VTN-OR-K50, executed 10-micron oil filtration loop, bled air from valve manifold, and calibrated system to 220 bar.",
+        "parts_used": [
+          {
+            "part_id": "PRT-1002",
+            "part_number": "VTN-OR-K50",
+            "part_name": "Hydraulic Valve Block Viton O-Ring Seal Kit",
+            "quantity": 1
+          }
+        ],
+        "actual_repair_hours": 3.8,
+        "resolution_remarks": "Hydraulic pressure test completed: 220 bar holding steady under 10 continuous load cycles with zero leakage.",
+        "submitted_at": "2026-10-30T15:30:00Z"
+      },
+      "history": [
+        {
+          "timestamp": "2026-10-29T10:00:00Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "High priority hydraulic incident assigned."
+        },
+        {
+          "timestamp": "2026-10-29T10:12:00Z",
+          "action": "ACCEPTED",
+          "performed_by_id": "USR-019",
+          "performed_by_name": "Rajesh Menon",
+          "performed_by_role": "TECHNICIAN"
+        },
+        {
+          "timestamp": "2026-10-29T11:00:00Z",
+          "action": "STARTED_REPAIR",
+          "performed_by_id": "USR-019",
+          "performed_by_name": "Rajesh Menon",
+          "performed_by_role": "TECHNICIAN"
+        },
+        {
+          "timestamp": "2026-10-30T15:30:00Z",
+          "action": "MARKED_RESOLVED",
+          "performed_by_id": "USR-019",
+          "performed_by_name": "Rajesh Menon",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Submitted for manager sign-off and verification."
+        }
+      ],
+      "created_at": "2026-10-29T10:00:00Z",
+      "updated_at": "2026-10-30T15:30:00Z"
+    },
+    {
+      "id": "ASN-2026-003",
+      "incident_id": "INC-0013",
+      "incident_title": "MIG Welder Robotic Arm Axis 4 Servo Position Jitter",
+      "incident_description": "Positional tracking error 0.6mm on Wrist Axis 4 during seam welding of chassis sub-frame.",
+      "machine_id": "M013",
+      "machine_name": "Robotic MIG Welding Cell 01",
+      "machine_code": "APX-ROB-01",
+      "machine_location": "Bay 2 - Robotic Assembly",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-018",
+      "technician_name": "Vikram Singh",
+      "technician_email": "tech.robotics@factoryops.com",
+      "technician_specialisation": "Automation & Robotics Technician",
+      "status": "PENDING ACCEPTANCE",
+      "priority": "Critical",
+      "assigned_date": "2026-10-28T14:00:00Z",
+      "due_date": "2026-10-29T18:00:00Z",
+      "is_overdue": true,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "repair_progress_percent": 0,
+      "identified_issue": "Wrist Axis 4 servo driver tracking variance > 0.5mm causing rough weld bead profile",
+      "root_cause_analysis": "Optical resolver cable shielding abrasion and high electrical noise from high frequency arc stabilizer",
+      "recommended_resolution": "Replace resolver cable harness, verify ferrite chokes on 400V drive leads, recalibrate axis home offset",
+      "required_tools": [
+        "KUKA SmartPAD Teach Pendant",
+        "Oscilloscope Fluke 190",
+        "Hex Calibration Pin Set"
+      ],
+      "spare_parts_required": [
+        {
+          "part_id": "PRT-1003",
+          "part_number": "TCH-TIP-12M",
+          "part_name": "MIG Welding Torch Heavy Duty Contact Tip 1.2mm",
+          "quantity": 4,
+          "is_in_stock": true,
+          "status": "Reserved"
+        }
+      ],
+      "estimated_repair_hours": 3,
+      "ai_recommendation_details": {
+        "match_score": 95,
+        "reasoning": "Vikram Singh is a certified KUKA robotics specialist with deep experience in robotic wrist kinematics and servo tuning.",
+        "required_specialisation": "Automation & Robotics Technician",
+        "matched_skills": [
+          "KUKA KRC4 Programming",
+          "Servo Drive Tuning",
+          "Safety Interlock Wiring"
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-10-28T14:00:00Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Critical robotic cell downtime assignment."
+        }
+      ],
+      "created_at": "2026-10-28T14:00:00Z",
+      "updated_at": "2026-10-28T14:00:00Z"
+    },
+    {
+      "id": "ASN-2026-004",
+      "incident_id": "INC-0083",
+      "incident_title": "VFD Over-Torque Trip on Drive Shaft Conveyor",
+      "incident_description": "ABB ACS880 drive tripped on error 3210 (Overcurrent) during high acceleration step.",
+      "machine_id": "M005",
+      "machine_name": "Shaft Induction Hardening Unit 01",
+      "machine_code": "APX-IND-01",
+      "machine_location": "Bay 1 - Thermal Treatment",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-013",
+      "technician_name": "Anil Sharma",
+      "technician_email": "tech.nova@factoryops.com",
+      "technician_specialisation": "Electrical Technician",
+      "status": "PENDING ACCEPTANCE",
+      "priority": "Medium",
+      "assigned_date": "2026-10-30T11:00:00Z",
+      "due_date": "2026-10-31T20:00:00Z",
+      "is_overdue": false,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "repair_progress_percent": 0,
+      "identified_issue": "Intermittent VFD trip under mechanical load transients",
+      "root_cause_analysis": "Motor thermal resistance shift and current loop gain parameter too aggressive for winter ambient",
+      "recommended_resolution": "Run motor ID run, adjust acceleration ramp from 1.8s to 2.4s, inspect motor terminal box for moisture",
+      "required_tools": [
+        "Fluke 87V Industrial Multimeter",
+        "Insulated Screwdriver Set 1000V",
+        "Megger Insulation Tester"
+      ],
+      "spare_parts_required": [],
+      "estimated_repair_hours": 2,
+      "ai_recommendation_details": {
+        "match_score": 92,
+        "reasoning": "Anil Sharma is skilled in VFD parameter optimization, motor protection relays, and 415V electrical panels.",
+        "required_specialisation": "Electrical Technician",
+        "matched_skills": [
+          "VFD Configuration",
+          "PLC Diagnostics",
+          "Thermal Imaging"
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-10-30T11:00:00Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Medium severity electrical drive troubleshooting assigned."
+        }
+      ],
+      "created_at": "2026-10-30T11:00:00Z",
+      "updated_at": "2026-10-30T11:00:00Z"
+    },
+    {
+      "id": "ASN-2026-005",
+      "incident_id": "INC-0021",
+      "incident_title": "Secondary Spindle Runout Deviation on Milling Center",
+      "incident_description": "Excessive spindle axial runout > 8 microns measured on finish cut stage.",
+      "machine_id": "M001",
+      "machine_name": "Apex 5-Axis CNC Machining Center 01",
+      "machine_code": "APX-CNC-01",
+      "machine_location": "Bay 1 - Heavy Machining",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-012",
+      "technician_name": "Ramesh Varma",
+      "technician_email": "tech.apex@factoryops.com",
+      "technician_specialisation": "Mechanical Technician",
+      "status": "VERIFIED",
+      "priority": "High",
+      "assigned_date": "2026-10-31T08:00:00Z",
+      "due_date": "2026-11-02T18:00:00Z",
+      "is_overdue": false,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "repair_progress_percent": 100,
+      "identified_issue": "Secondary spindle taper contamination causing tool holder runout",
+      "root_cause_analysis": "Debris accumulation on BT40 taper contact face",
+      "recommended_resolution": "Clean spindle taper with cleaning arbor, verify drawbar clamping force",
+      "required_tools": [
+        "Taper Cleaning Stick",
+        "Clamping Force Gauge",
+        "Dial Indicator (0.001mm)"
+      ],
+      "spare_parts_required": [],
+      "estimated_repair_hours": 1.5,
+      "ai_recommendation_details": {
+        "match_score": 94,
+        "reasoning": "Ramesh Varma is primary mechanical technician for Apex Bay 1.",
+        "required_specialisation": "Mechanical Technician",
+        "matched_skills": [
+          "Spindle Alignment",
+          "Precision Machining"
+        ]
+      },
+      "history": [
+        {
+          "timestamp": "2026-10-31T08:00:00Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Assigned for immediate taper inspection and runout verification."
+        },
+        {
+          "timestamp": "2026-11-02T13:21:44.180Z",
+          "action": "ACCEPTED",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Accepted by Ramesh"
+        },
+        {
+          "timestamp": "2026-11-02T13:21:45.303Z",
+          "action": "STARTED_REPAIR",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "LOTO Applied"
+        },
+        {
+          "timestamp": "2026-11-02T13:21:46.528Z",
+          "action": "PROGRESS_UPDATE",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Progress logged: 60%. Notes: Spindle taper cleaned and verified zero runout with dial test indicator."
+        },
+        {
+          "timestamp": "2026-11-02T13:21:47.591Z",
+          "action": "MARKED_RESOLVED",
+          "performed_by_id": "USR-012",
+          "performed_by_name": "Ramesh Varma (Senior Technician)",
+          "performed_by_role": "TECHNICIAN",
+          "notes": "Repair finished in 1.2h and submitted for Manager verification."
+        },
+        {
+          "timestamp": "2026-11-02T13:21:48.744Z",
+          "action": "VERIFIED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh (Manager/Supervisor)",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Repair verified and approved by Amit Deshmukh (Manager/Supervisor). Quality Rating: 5/5"
+        },
+        {
+          "timestamp": "2026-11-02T13:21:48.744Z",
+          "action": "CLOSED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh (Manager/Supervisor)",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Incident lifecycle closed."
+        }
+      ],
+      "created_at": "2026-10-31T08:00:00Z",
+      "updated_at": "2026-11-02T13:21:49.529Z",
+      "accepted_at": "2026-11-02T13:21:44.180Z",
+      "repair_started_at": "2026-11-02T13:21:45.303Z",
+      "repair_notes": "Spindle taper cleaned and verified zero runout with dial test indicator.",
+      "progress_updates": [
+        {
+          "id": "UPD-06528",
+          "timestamp": "2026-11-02T13:21:46.528Z",
+          "progress_percent": 60,
+          "diagnosis_notes": "Spindle taper cleaned and verified zero runout with dial test indicator.",
+          "updated_by_id": "USR-012",
+          "updated_by_name": "Ramesh Varma (Senior Technician)"
+        }
+      ],
+      "resolved_at": "2026-11-02T13:21:47.591Z",
+      "resolution_submission": {
+        "confirmed_root_cause": "Particulate build-up on spindle taper collar",
+        "actions_taken": "Cleaned with solvent arbor and calibrated drawbar force",
+        "parts_used": [],
+        "actual_repair_hours": 1.2,
+        "resolution_remarks": "Total runout restored to < 2 microns. Verified with master arbor.",
+        "submitted_at": "2026-11-02T13:21:47.591Z"
+      },
+      "verified_at": "2026-11-02T13:21:48.744Z",
+      "verification_details": {
+        "verified_by_id": "USR-007",
+        "verified_by_name": "Amit Deshmukh (Manager/Supervisor)",
+        "verified_by_role": "MANAGER_SUPERVISOR",
+        "verified_at": "2026-11-02T13:21:48.744Z",
+        "verification_notes": "Excellent work. Spindle runout meets ISO tolerance.",
+        "quality_rating": 5
+      }
+    },
+    {
+      "id": "ASN-2026-10174",
+      "incident_id": "INC-0013",
+      "incident_title": "Welding wire drive slip during seam tracking",
+      "incident_description": "Blew out torch liner and adjusted drive roll tension",
+      "machine_id": "M013",
+      "machine_name": "Robotic MIG Welding Cell 01",
+      "machine_code": "M013",
+      "machine_location": "Welding Line 3",
+      "factory_id": "FAC-001",
+      "factory_name": "Apex Precision Manufacturing",
+      "technician_id": "USR-018",
+      "technician_name": "Vikram Singh (Robotics Specialist)",
+      "technician_email": "tech.robotics@factoryops.com",
+      "technician_specialisation": "Automation & Robotics Technician",
+      "status": "PENDING ACCEPTANCE",
+      "priority": "Critical",
+      "assigned_date": "2026-11-02T13:21:50.174Z",
+      "due_date": "2026-11-03T13:21:49.738Z",
+      "is_overdue": false,
+      "assigned_by_id": "USR-007",
+      "assigned_by_name": "Amit Deshmukh (Manager/Supervisor)",
+      "assigned_by_role": "MANAGER_SUPERVISOR",
+      "repair_progress_percent": 0,
+      "identified_issue": "Wrist Axis 4 servo tracking jitter",
+      "root_cause_analysis": "Cable noise on high frequency arc stabilizer",
+      "recommended_resolution": "Shield harness and recalibrate home",
+      "required_tools": [
+        "KUKA SmartPAD"
+      ],
+      "spare_parts_required": [],
+      "estimated_repair_hours": 3,
+      "progress_updates": [],
+      "history": [
+        {
+          "timestamp": "2026-11-02T13:21:50.174Z",
+          "action": "ASSIGNED",
+          "performed_by_id": "USR-007",
+          "performed_by_name": "Amit Deshmukh (Manager/Supervisor)",
+          "performed_by_role": "MANAGER_SUPERVISOR",
+          "notes": "Incident assigned to technician"
+        }
+      ],
+      "created_at": "2026-11-02T13:21:50.174Z",
+      "updated_at": "2026-11-02T13:21:50.174Z"
+    }
+  ]
 }

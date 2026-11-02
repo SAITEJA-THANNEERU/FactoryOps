@@ -15,7 +15,10 @@ import type {
   AttendanceAuditLog,
   AttendanceSummaryKPIs,
   SparePart,
-  SystemAuditLog
+  SystemAuditLog,
+  TechnicianProfile,
+  TechnicianIncidentAssignment,
+  TechnicianRecommendationResult
 } from '../types/index.ts';
 
 const TOKEN_KEY = 'factoryops_auth_token';
@@ -600,6 +603,80 @@ class ApiService {
       notes?: string;
     }): Promise<{ success: boolean; message: string; record: AttendanceRecord }> => {
       return this.request<{ success: boolean; message: string; record: AttendanceRecord }>('/api/attendance/manual-exception', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    }
+  };
+
+  // --- Technician Management & AI Assignment ---
+  public technicians = {
+    getAll: async (): Promise<TechnicianProfile[]> => {
+      return this.request<TechnicianProfile[]>('/api/technicians');
+    }
+  };
+
+  public technicianAssignments = {
+    getAll: async (status?: string): Promise<TechnicianIncidentAssignment[]> => {
+      const q = status && status !== 'ALL' ? `?status=${encodeURIComponent(status)}` : '';
+      return this.request<TechnicianIncidentAssignment[]>(`/api/technician-assignments${q}`);
+    },
+    recommend: async (incidentId: string): Promise<TechnicianRecommendationResult> => {
+      return this.request<TechnicianRecommendationResult>('/api/technician-assignments/recommend', {
+        method: 'POST',
+        body: JSON.stringify({ incident_id: incidentId })
+      });
+    },
+    assign: async (data: Partial<TechnicianIncidentAssignment>): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>('/api/technician-assignments', {
+        method: 'POST',
+        body: JSON.stringify(data)
+      });
+    },
+    accept: async (id: string, notes?: string): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/accept`, {
+        method: 'POST',
+        body: JSON.stringify({ notes })
+      });
+    },
+    reject: async (id: string, rejectionReason: string): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/reject`, {
+        method: 'POST',
+        body: JSON.stringify({ rejection_reason: rejectionReason })
+      });
+    },
+    requestReassignment: async (id: string, reassignmentReason: string): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/request-reassignment`, {
+        method: 'POST',
+        body: JSON.stringify({ reassignment_reason: reassignmentReason })
+      });
+    },
+    reviewReassignment: async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; new_technician_id?: string; manager_notes?: string }): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/review-reassignment`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    startRepair: async (id: string, notes?: string): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/start-repair`, {
+        method: 'POST',
+        body: JSON.stringify({ notes })
+      });
+    },
+    progressUpdate: async (id: string, payload: { progress_percent: number; diagnosis_notes: string; additional_problems_found?: string }): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/progress-update`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    resolve: async (id: string, payload: { confirmed_root_cause: string; actions_taken: string; parts_used?: any[]; actual_repair_hours: number; resolution_remarks?: string }): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/resolve`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
+    },
+    verify: async (id: string, payload: { decision: 'APPROVE' | 'REJECT'; verification_notes?: string; quality_rating?: number; rework_instructions?: string }): Promise<TechnicianIncidentAssignment> => {
+      return this.request<TechnicianIncidentAssignment>(`/api/technician-assignments/${id}/verify`, {
         method: 'POST',
         body: JSON.stringify(payload)
       });

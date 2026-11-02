@@ -32,6 +32,8 @@ const PRESET_PLANTS = [
 ];
 
 // 1.0 km (1,000 metres) Geofence Circle Component
+declare const google: any;
+
 interface MapCircleProps {
   center: { lat: number; lng: number };
   radius: number;
@@ -39,7 +41,7 @@ interface MapCircleProps {
 
 const MapCircle: React.FC<MapCircleProps> = ({ center, radius }) => {
   const map = useMap();
-  const circleRef = useRef<google.maps.Circle | null>(null);
+  const circleRef = useRef<any>(null);
 
   useEffect(() => {
     if (!map) return;
