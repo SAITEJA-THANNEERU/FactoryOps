@@ -50,6 +50,8 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
   onOpenIncidentModal,
   onOpenWorkOrderModal
 }) => {
+  const [productionTimeframe, setProductionTimeframe] = useState<'all' | 'last7' | 'last30' | 'last90' | 'jul' | 'aug' | 'sep'>('all');
+
   // Top KPIs computed from actual operational records
   const totalActualProduction = useMemo(() => {
     return production.reduce((sum, p) => sum + (Number(p.actual_units) || 0), 0);
@@ -80,29 +82,77 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
     return Number((sqDiffSum / production.length).toFixed(2));
   }, [production, overallOee]);
 
-  // Production Over Time (Daily line chart, 31K to 35K)
+  // Production Over Time (Daily line chart with timeframe filter and zero-filled dates)
   const productionOverTime = useMemo(() => {
     const dateMap: Record<string, number> = {};
+    const validDatesSet = new Set<string>();
+
     production.forEach(p => {
       const d = p.date ? p.date.substring(0, 10) : '';
-      if (d) {
+      if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) {
         dateMap[d] = (dateMap[d] || 0) + (Number(p.actual_units) || 0);
+        validDatesSet.add(d);
       }
     });
 
-    return Object.entries(dateMap)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, actual_units]) => {
-        const dt = new Date(date);
-        const monthName = dt.toLocaleString('en-US', { month: 'short' });
-        const day = dt.getDate();
-        return {
-          date,
-          label: `${monthName} ${day}`,
-          actual_units
-        };
+    const validDates = Array.from(validDatesSet).sort((a, b) => a.localeCompare(b));
+    if (validDates.length === 0) return [];
+
+    let startDateStr = validDates[0];
+    let endDateStr = validDates[validDates.length - 1];
+
+    if (productionTimeframe === 'last7') {
+      const endDt = new Date(endDateStr + 'T00:00:00Z');
+      const startDt = new Date(endDt);
+      startDt.setUTCDate(startDt.getUTCDate() - 6);
+      startDateStr = startDt.toISOString().substring(0, 10);
+    } else if (productionTimeframe === 'last30') {
+      const endDt = new Date(endDateStr + 'T00:00:00Z');
+      const startDt = new Date(endDt);
+      startDt.setUTCDate(startDt.getUTCDate() - 29);
+      startDateStr = startDt.toISOString().substring(0, 10);
+    } else if (productionTimeframe === 'last90') {
+      const endDt = new Date(endDateStr + 'T00:00:00Z');
+      const startDt = new Date(endDt);
+      startDt.setUTCDate(startDt.getUTCDate() - 89);
+      startDateStr = startDt.toISOString().substring(0, 10);
+    } else if (productionTimeframe === 'jul') {
+      startDateStr = '2026-07-01';
+      endDateStr = '2026-07-31';
+    } else if (productionTimeframe === 'aug') {
+      startDateStr = '2026-08-01';
+      endDateStr = '2026-08-31';
+    } else if (productionTimeframe === 'sep') {
+      startDateStr = '2026-09-01';
+      endDateStr = '2026-09-30';
+    }
+
+    const result = [];
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const curr = new Date(startDateStr + 'T00:00:00Z');
+    const end = new Date(endDateStr + 'T00:00:00Z');
+
+    while (curr <= end) {
+      const yyyy = curr.getUTCFullYear();
+      const mm = String(curr.getUTCMonth() + 1).padStart(2, '0');
+      const dd = String(curr.getUTCDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+
+      const actual_units = dateMap[dateStr] || 0;
+      const mName = monthNames[curr.getUTCMonth()];
+      const day = curr.getUTCDate();
+
+      result.push({
+        date: dateStr,
+        label: `${mName} ${day}`,
+        actual_units
       });
-  }, [production]);
+
+      curr.setUTCDate(curr.getUTCDate() + 1);
+    }
+
+    return result;
+  }, [production, productionTimeframe]);
 
   // Monthly Production vs Target (July, August, September)
   const monthlyProductionVsTarget = useMemo(() => {
@@ -286,12 +336,30 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
         <div className="lg:col-span-4 min-w-0">
           <PowerBiVisualContainer
             title="Production Over Time"
-            subtitle="Sum of actual_units by Year, Quarter, Month and Day"
+            subtitle="Sum of actual_units by date • Zero-filled missing dates"
             headerBg="bg-[#a04000]"
             headerTextColor="text-white"
             bodyBg="bg-white"
             borderColor="border-slate-300"
             heightClass="h-[310px]"
+            rightAction={
+              <div className="flex items-center gap-1.5">
+                <select
+                  value={productionTimeframe}
+                  onChange={(e) => setProductionTimeframe(e.target.value as any)}
+                  className="px-2 py-0.5 text-[10px] font-semibold rounded-md border border-amber-800 bg-[#7d3200] text-white shadow-2xs hover:bg-[#682900] focus:outline-none focus:ring-1 focus:ring-amber-300 cursor-pointer"
+                  title="Select date range filter"
+                >
+                  <option value="all">All Time (Full Range)</option>
+                  <option value="last7">Last 7 Days</option>
+                  <option value="last30">Last 30 Days</option>
+                  <option value="last90">Last 90 Days</option>
+                  <option value="jul">July 2026</option>
+                  <option value="aug">August 2026</option>
+                  <option value="sep">September 2026</option>
+                </select>
+              </div>
+            }
           >
             <div className="h-full w-full pt-1">
               <ResponsiveContainer width="100%" height="100%">
@@ -305,14 +373,14 @@ export const ManagerDashboardView: React.FC<ManagerDashboardViewProps> = ({
                     stroke="#64748b"
                     fontSize={9}
                     tickLine={false}
-                    interval={25}
+                    interval="preserveStartEnd"
+                    minTickGap={25}
                   />
                   <YAxis
                     stroke="#64748b"
                     fontSize={9}
-                    domain={[31000, 35500]}
-                    ticks={[31000, 32000, 33000, 34000, 35000]}
-                    tickFormatter={(v) => `${Math.round(v / 1000)}K`}
+                    domain={['auto', 'auto']}
+                    tickFormatter={(v) => v >= 1000 ? `${Math.round(v / 1000)}K` : v}
                   />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#ffffff', borderColor: '#cbd5e1', color: '#0f172a', fontSize: '11px' }}

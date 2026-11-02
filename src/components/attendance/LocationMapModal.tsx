@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { APIProvider, Map, AdvancedMarker, useMap } from '@vis.gl/react-google-maps';
 import { api } from '../../services/api.ts';
 import { useAuth } from '../../contexts/AuthContext.tsx';
 import type { FactoryLocation } from '../../types/index.ts';
@@ -9,11 +10,11 @@ import {
   AlertTriangle,
   X,
   Compass,
-  Building2,
   Save,
   Loader2,
   ShieldCheck,
-  Globe
+  Globe,
+  RefreshCw
 } from 'lucide-react';
 
 interface LocationMapModalProps {
@@ -30,21 +31,78 @@ const PRESET_PLANTS = [
   { name: 'Vertex Auto (Chennai)', lat: 13.0827, lng: 80.2707, address: 'Ambattur Industrial Estate, Chennai, Tamil Nadu 600058' }
 ];
 
+// 1.0 km (1,000 metres) Geofence Circle Component
+interface MapCircleProps {
+  center: { lat: number; lng: number };
+  radius: number;
+}
+
+const MapCircle: React.FC<MapCircleProps> = ({ center, radius }) => {
+  const map = useMap();
+  const circleRef = useRef<google.maps.Circle | null>(null);
+
+  useEffect(() => {
+    if (!map) return;
+
+    if (!circleRef.current) {
+      circleRef.current = new google.maps.Circle({
+        map,
+        center,
+        radius,
+        strokeColor: '#0E79B2',
+        strokeOpacity: 0.85,
+        strokeWeight: 2,
+        fillColor: '#0E79B2',
+        fillOpacity: 0.18,
+        clickable: false
+      });
+    } else {
+      circleRef.current.setCenter(center);
+      circleRef.current.setRadius(radius);
+    }
+  }, [map, center.lat, center.lng, radius]);
+
+  useEffect(() => {
+    return () => {
+      if (circleRef.current) {
+        circleRef.current.setMap(null);
+        circleRef.current = null;
+      }
+    };
+  }, []);
+
+  return null;
+};
+
+// Map Recenter Controller
+const MapRecenterController: React.FC<{ center: { lat: number; lng: number } }> = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (map) {
+      map.panTo(center);
+    }
+  }, [map, center.lat, center.lng]);
+  return null;
+};
+
 export const LocationMapModal: React.FC<LocationMapModalProps> = ({
   isOpen,
   onClose,
   onLocationSaved,
   currentLocation
 }) => {
-  const { user, activeFactory } = useAuth();
+  const { activeFactory } = useAuth();
 
   const [lat, setLat] = useState<number>(currentLocation?.latitude || 17.4435);
   const [lng, setLng] = useState<number>(currentLocation?.longitude || 78.3772);
   const [address, setAddress] = useState<string>(currentLocation?.address || 'Sanath Nagar Industrial Estate, Hyderabad, Telangana 500018');
   const [isDetectingGps, setIsDetectingGps] = useState<boolean>(false);
+  const [isGeocoding, setIsGeocoding] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const googleMapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
 
   useEffect(() => {
     if (currentLocation) {
@@ -54,7 +112,38 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
     }
   }, [currentLocation]);
 
+  // Quota warning global listener (Case A / Demo key defense)
+  useEffect(() => {
+    const handleQuotaExceeded = () => {
+      setErrorMsg('Google Maps Platform quota reached. You can still set coordinates manually.');
+    };
+    window.addEventListener('gmp-quota-exceeded', handleQuotaExceeded);
+    return () => window.removeEventListener('gmp-quota-exceeded', handleQuotaExceeded);
+  }, []);
+
   if (!isOpen) return null;
+
+  // Reverse Geocoding Helper
+  const performReverseGeocode = useCallback(async (targetLat: number, targetLng: number, forceOverwrite = false) => {
+    if (!googleMapsApiKey) return;
+    setIsGeocoding(true);
+    try {
+      const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${targetLat},${targetLng}&key=${googleMapsApiKey}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.status === 'OK' && data.results && data.results.length > 0) {
+          const fetchedAddress = data.results[0].formatted_address;
+          if (forceOverwrite || !address || address.startsWith('GPS Device Location:')) {
+            setAddress(fetchedAddress);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Reverse geocoding error:', err);
+    } finally {
+      setIsGeocoding(false);
+    }
+  }, [googleMapsApiKey, address]);
 
   const handleUseCurrentLocation = () => {
     setErrorMsg(null);
@@ -73,8 +162,8 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
         const detectedLng = Number(pos.coords.longitude.toFixed(6));
         setLat(detectedLat);
         setLng(detectedLng);
-        setAddress(`GPS Device Location: Lat ${detectedLat}, Lon ${detectedLng} (Accurate to ${Math.round(pos.coords.accuracy)}m)`);
-        setSuccessMsg(`Device GPS coordinates detected (±${Math.round(pos.coords.accuracy)}m accuracy). Ready to save.`);
+        setSuccessMsg(`Device GPS coordinates detected (±${Math.round(pos.coords.accuracy)}m accuracy).`);
+        performReverseGeocode(detectedLat, detectedLng, true);
       },
       err => {
         setIsDetectingGps(false);
@@ -129,13 +218,10 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
     }
   };
 
-  // Google Maps embed preview URL using coordinates
-  const mapPreviewUrl = `https://maps.google.com/maps?q=${lat},${lng}&z=15&output=embed`;
-
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
+        {/* Modal Header */}
         <div className="p-4 sm:p-5 bg-[#191923] text-white flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[#0E79B2] flex items-center justify-center text-white shadow-xs">
@@ -173,7 +259,7 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
             </div>
           )}
 
-          {/* Location Actions: Current GPS vs Presets */}
+          {/* Quick Actions Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100">
             <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
               <Compass className="w-4 h-4 text-[#0E79B2]" />
@@ -229,27 +315,59 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
             </div>
           </div>
 
-          {/* Interactive Map Visualizer */}
+          {/* Interactive Google Maps Component */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between text-xs">
               <span className="font-semibold text-slate-700 flex items-center gap-1.5">
                 <Globe className="w-3.5 h-3.5 text-[#0E79B2]" />
-                <span>Geofence Boundary Map Preview</span>
+                <span>Interactive Geofence Map (Click or Drag Marker)</span>
               </span>
               <span className="font-mono text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
                 1.0 km (1,000m) Radius Active
               </span>
             </div>
 
-            <div className="w-full h-48 bg-slate-100 rounded-xl border border-slate-200 overflow-hidden relative shadow-inner">
-              <iframe
-                title="Factory Location Map"
-                src={mapPreviewUrl}
-                className="w-full h-full border-0 pointer-events-auto"
-                loading="lazy"
-              />
-              <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200 text-[10px] font-mono text-slate-800 shadow-2xs pointer-events-none">
-                📍 Center: {lat.toFixed(5)}, {lng.toFixed(5)}
+            <div className="w-full h-64 bg-slate-100 rounded-xl border border-slate-200 overflow-hidden relative shadow-inner">
+              <APIProvider apiKey={googleMapsApiKey}>
+                <Map
+                  mapId="DEMO_MAP_ID"
+                  defaultCenter={{ lat, lng }}
+                  defaultZoom={14}
+                  gestureHandling="greedy"
+                  disableDefaultUI={false}
+                  internalUsageAttributionIds={['gmp_mcp_codeassist_v1_aistudio']}
+                  onClick={(e) => {
+                    if (e.detail.latLng) {
+                      const newLat = Number(e.detail.latLng.lat.toFixed(6));
+                      const newLng = Number(e.detail.latLng.lng.toFixed(6));
+                      setLat(newLat);
+                      setLng(newLng);
+                      performReverseGeocode(newLat, newLng, false);
+                    }
+                  }}
+                  className="w-full h-full"
+                >
+                  <MapRecenterController center={{ lat, lng }} />
+                  <AdvancedMarker
+                    position={{ lat, lng }}
+                    draggable={true}
+                    onDragEnd={(e) => {
+                      if (e.latLng) {
+                        const newLat = Number(e.latLng.lat().toFixed(6));
+                        const newLng = Number(e.latLng.lng().toFixed(6));
+                        setLat(newLat);
+                        setLng(newLng);
+                        performReverseGeocode(newLat, newLng, false);
+                      }
+                    }}
+                  />
+                  <MapCircle center={{ lat, lng }} radius={1000} />
+                </Map>
+              </APIProvider>
+
+              <div className="absolute bottom-2 left-2 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-md border border-slate-200 text-[10px] font-mono text-slate-800 shadow-2xs pointer-events-none z-10 flex items-center gap-1.5">
+                <MapPin className="w-3 h-3 text-[#0E79B2]" />
+                <span>Selected Center: {lat.toFixed(5)}, {lng.toFixed(5)}</span>
               </div>
             </div>
           </div>
@@ -287,9 +405,21 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
             </div>
 
             <div className="sm:col-span-2">
-              <label className="block font-semibold text-slate-700 mb-1">
-                Factory Physical Address / Facility Note
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block font-semibold text-slate-700">
+                  Factory Physical Address / Facility Note
+                </label>
+                <button
+                  type="button"
+                  onClick={() => performReverseGeocode(lat, lng, true)}
+                  disabled={isGeocoding}
+                  className="text-[10px] text-[#0E79B2] hover:underline font-semibold flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                  title="Reverse geocode address for current coordinates"
+                >
+                  <RefreshCw className={`w-3 h-3 ${isGeocoding ? 'animate-spin' : ''}`} />
+                  <span>Reverse Geocode Address</span>
+                </button>
+              </div>
               <input
                 type="text"
                 value={address}
