@@ -293,6 +293,99 @@
   ],
   "machines": [
     {
+      "machine_id": "MAC-TEST-1793732810074",
+      "machine_name": "Sync Test Machine",
+      "line_id": "L01",
+      "line_name": "Line 1",
+      "station_number": "ST-01",
+      "machine_type": "CNC",
+      "manufacturer": "Industrial Dynamics",
+      "model": "Series-V",
+      "serial_number": "SN-803831",
+      "installation_date": "2026-01-01",
+      "target_cycle_time_seconds": 60,
+      "rated_capacity_uph": 60,
+      "power_rating_kw": 25,
+      "maintenance_interval_days": 30,
+      "status": "running",
+      "id": "MAC-TEST-1793732810074",
+      "factory_id": "FAC-001",
+      "name": "Sync Test Machine",
+      "type": "CNC",
+      "line": "Line 1",
+      "health_score": 99,
+      "temperature_c": 45,
+      "vibration_mms": 0.8,
+      "pressure_bar": 5.5,
+      "speed_rpm": 1200,
+      "oee": 95,
+      "operator": "Automated Test",
+      "install_date": "2026-01-01",
+      "last_service_date": "2026-01-01"
+    },
+    {
+      "machine_id": "MAC-TEST-1793732782304",
+      "machine_name": "Sync Test Machine",
+      "line_id": "L01",
+      "line_name": "Line 1",
+      "station_number": "ST-01",
+      "machine_type": "CNC",
+      "manufacturer": "Industrial Dynamics",
+      "model": "Series-V",
+      "serial_number": "SN-291914",
+      "installation_date": "2026-01-01",
+      "target_cycle_time_seconds": 60,
+      "rated_capacity_uph": 60,
+      "power_rating_kw": 25,
+      "maintenance_interval_days": 30,
+      "status": "running",
+      "id": "MAC-TEST-1793732782304",
+      "factory_id": "FAC-001",
+      "name": "Sync Test Machine",
+      "type": "CNC",
+      "line": "Line 1",
+      "health_score": 99,
+      "temperature_c": 45,
+      "vibration_mms": 0.8,
+      "pressure_bar": 5.5,
+      "speed_rpm": 1200,
+      "oee": 95,
+      "operator": "Automated Test",
+      "install_date": "2026-01-01",
+      "last_service_date": "2026-01-01"
+    },
+    {
+      "machine_id": "MAC-TEST-1793732738944",
+      "machine_name": "Sync Test Machine",
+      "line_id": "L01",
+      "line_name": "Line 1",
+      "station_number": "ST-01",
+      "machine_type": "CNC",
+      "manufacturer": "Industrial Dynamics",
+      "model": "Series-V",
+      "serial_number": "SN-122831",
+      "installation_date": "2026-01-01",
+      "target_cycle_time_seconds": 60,
+      "rated_capacity_uph": 60,
+      "power_rating_kw": 25,
+      "maintenance_interval_days": 30,
+      "status": "running",
+      "id": "MAC-TEST-1793732738944",
+      "factory_id": "FAC-001",
+      "name": "Sync Test Machine",
+      "type": "CNC",
+      "line": "Line 1",
+      "health_score": 99,
+      "temperature_c": 45,
+      "vibration_mms": 0.8,
+      "pressure_bar": 5.5,
+      "speed_rpm": 1200,
+      "oee": 95,
+      "operator": "Automated Test",
+      "install_date": "2026-01-01",
+      "last_service_date": "2026-01-01"
+    },
+    {
       "machine_id": "TEST-M900",
       "machine_name": "SecTest CNC 900",
       "line_id": "L01",
@@ -239725,7 +239818,7 @@
       "rating": 4.9,
       "completed_repairs_count": 87,
       "created_at": "2024-01-10T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.329Z"
     },
     {
       "id": "TECH-002",
@@ -239760,7 +239853,7 @@
       "rating": 4.8,
       "completed_repairs_count": 64,
       "created_at": "2024-02-15T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.330Z"
     },
     {
       "id": "TECH-003",
@@ -239794,7 +239887,7 @@
       "rating": 4.7,
       "completed_repairs_count": 53,
       "created_at": "2024-03-01T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.330Z"
     },
     {
       "id": "TECH-004",
@@ -239829,7 +239922,7 @@
       "rating": 4.9,
       "completed_repairs_count": 72,
       "created_at": "2024-04-10T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.330Z"
     },
     {
       "id": "TECH-005",
@@ -239864,7 +239957,7 @@
       "rating": 4.95,
       "completed_repairs_count": 115,
       "created_at": "2024-01-05T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.330Z"
     },
     {
       "id": "TECH-006",
@@ -239899,7 +239992,7 @@
       "rating": 4.85,
       "completed_repairs_count": 48,
       "created_at": "2024-05-12T08:00:00Z",
-      "updated_at": "2026-11-03T17:14:45.192Z"
+      "updated_at": "2026-11-03T19:16:45.330Z"
     }
   ],
   "technicianAssignments": [
