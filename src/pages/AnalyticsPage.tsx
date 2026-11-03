@@ -2,6 +2,7 @@ import React from 'react';
 import { useData } from '../contexts/DataContext.tsx';
 import { BarChart3 } from 'lucide-react';
 import { formatPercent } from '../utils/formatters.ts';
+import { PowerBiVisualContainer } from '../components/dashboard/PowerBiComponents.tsx';
 import {
   BarChart,
   Bar,
@@ -53,9 +54,12 @@ export const AnalyticsPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
-        <h2 className="text-sm font-bold text-slate-900 mb-4">Equipment OEE & Health Distribution</h2>
-        <div className="h-64 w-full min-w-0">
+      <PowerBiVisualContainer
+        title="Equipment OEE & Health Distribution"
+        subtitle="OEE % and Health Score % metrics across all machinery"
+        heightClass="h-[380px]"
+      >
+        <div className="h-full w-full min-w-0">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={machineChartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
@@ -75,7 +79,7 @@ export const AnalyticsPage: React.FC = () => {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
+      </PowerBiVisualContainer>
     </div>
   );
 };

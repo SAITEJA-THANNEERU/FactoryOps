@@ -1,6 +1,7 @@
 import React from 'react';
 import { useData } from '../contexts/DataContext.tsx';
 import { CheckCircle2 } from 'lucide-react';
+import { PowerBiVisualContainer } from '../components/dashboard/PowerBiComponents.tsx';
 import {
   formatWholeNumber,
   formatPercent,
@@ -45,9 +46,12 @@ export const QualityPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-lg p-5 shadow-xs">
-        <h2 className="text-sm font-bold text-slate-900 mb-3">Defect Distribution by Machine</h2>
-        <div className="w-full overflow-x-auto">
+      <PowerBiVisualContainer
+        title="Defect Distribution by Machine"
+        subtitle="Defective units, scrap generation, and yield rate per machine"
+        heightClass="h-[420px]"
+      >
+        <div className="w-full h-full overflow-x-auto overflow-y-auto">
           <table className="w-full min-w-[500px] text-left text-xs">
             <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
@@ -76,7 +80,7 @@ export const QualityPage: React.FC = () => {
             </tbody>
           </table>
         </div>
-      </div>
+      </PowerBiVisualContainer>
     </div>
   );
 };

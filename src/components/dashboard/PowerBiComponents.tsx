@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Filter,
   Maximize2,
@@ -8,7 +9,8 @@ import {
   RefreshCw,
   Printer,
   Share2,
-  Check
+  Check,
+  X
 } from 'lucide-react';
 
 import { formatNumber, formatWholeNumber, formatCompactNumber, safeNumber } from '../../utils/formatters.ts';
@@ -326,7 +328,7 @@ export const PowerBiCard: React.FC<PowerBiCardProps> = ({
 }) => {
   return (
     <div className="bg-white border border-slate-200/90 hover:border-[#0E79B2]/40 rounded-xl p-3.5 sm:p-4 shadow-2xs hover:shadow-xs transition-all duration-200 motion-reduce:transition-none hover:-translate-y-0.5 flex flex-col justify-between group">
-      {/* Top Header: Icon + Label + Expand Arrow */}
+      {/* Top Header: Icon + Label */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
           {icon && (
@@ -337,9 +339,6 @@ export const PowerBiCard: React.FC<PowerBiCardProps> = ({
           <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider truncate">
             {title}
           </span>
-        </div>
-        <div className="w-5 h-5 rounded-full bg-slate-50 border border-slate-200/70 group-hover:bg-[#0E79B2]/10 group-hover:border-[#0E79B2]/30 flex items-center justify-center text-slate-400 group-hover:text-[#0E79B2] transition-colors shrink-0">
-          <span className="text-[10px] font-bold">↗</span>
         </div>
       </div>
 
@@ -389,30 +388,114 @@ export const PowerBiVisualContainer: React.FC<PowerBiVisualContainerProps> = ({
   heightClass = 'h-[300px]',
   rightAction
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Lock body scroll when Visual Focus Mode is active
+  useEffect(() => {
+    if (isExpanded) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isExpanded]);
+
+  // Escape key listener to close Visual Focus Mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isExpanded) {
+        setIsExpanded(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isExpanded]);
+
   return (
-    <div className={`bg-white border border-slate-200/90 hover:border-slate-300 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-200 motion-reduce:transition-none overflow-hidden flex flex-col ${heightClass}`}>
-      <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
-        <div className="truncate pr-2">
-          <h2 className="text-xs font-bold text-[#191923] uppercase tracking-wide truncate">
-            {title}
-          </h2>
-          {subtitle && (
-            <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
-              {subtitle}
-            </p>
-          )}
-        </div>
-        {rightAction ? (
-          <div className="shrink-0">{rightAction}</div>
-        ) : (
-          <div className="w-5 h-5 rounded-full bg-slate-50 border border-slate-200/60 flex items-center justify-center text-slate-400 text-[10px] font-bold shrink-0 hover:text-[#0E79B2] transition-colors cursor-pointer">
-            ↗
+    <>
+      <div className={`bg-white border border-slate-200/90 hover:border-slate-300 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-200 motion-reduce:transition-none overflow-hidden flex flex-col ${heightClass}`}>
+        <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+          <div className="truncate pr-2">
+            <h2 className="text-xs font-bold text-[#191923] uppercase tracking-wide truncate">
+              {title}
+            </h2>
+            {subtitle && (
+              <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                {subtitle}
+              </p>
+            )}
           </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {rightAction && <div className="shrink-0">{rightAction}</div>}
+            <button
+              type="button"
+              onClick={() => setIsExpanded(true)}
+              className="w-6 h-6 rounded-lg bg-slate-50 hover:bg-[#0E79B2]/10 border border-slate-200/70 hover:border-[#0E79B2]/30 flex items-center justify-center text-slate-500 hover:text-[#0E79B2] text-xs font-bold transition-all cursor-pointer shadow-2xs shrink-0"
+              title="Expand Visual Focus Mode (↗)"
+              aria-label="Expand Visual Focus Mode"
+            >
+              ↗
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 p-2.5 sm:p-3 overflow-hidden relative bg-white">
+          {children}
+        </div>
+      </div>
+
+      {/* Visual Focus Mode Center Modal Portal */}
+      {isExpanded &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 md:p-8 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200"
+            onClick={() => setIsExpanded(false)}
+          >
+            <div
+              className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl h-[82vh] max-h-[900px] flex flex-col overflow-hidden relative animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Focus Mode Header */}
+              <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+                <div className="truncate pr-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0E79B2]/10 text-[#0E79B2] border border-[#0E79B2]/20 font-mono">
+                      Visual Focus Mode
+                    </span>
+                    <h2 className="text-sm sm:text-base font-bold text-[#191923] tracking-wide truncate">
+                      {title}
+                    </h2>
+                  </div>
+                  {subtitle && (
+                    <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                      {subtitle}
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {rightAction && <div className="shrink-0">{rightAction}</div>}
+                  <button
+                    type="button"
+                    onClick={() => setIsExpanded(false)}
+                    className="p-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer flex items-center justify-center border border-slate-200"
+                    title="Close Visual Focus Mode (Esc)"
+                    aria-label="Close Visual Focus Mode"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Focus Mode Body with fully interactive visual content */}
+              <div className="flex-1 p-4 sm:p-6 overflow-auto bg-white relative flex flex-col min-h-0">
+                {children}
+              </div>
+            </div>
+          </div>,
+          document.body
         )}
-      </div>
-      <div className="flex-1 p-2.5 sm:p-3 overflow-hidden relative bg-white">
-        {children}
-      </div>
-    </div>
+    </>
   );
 };
