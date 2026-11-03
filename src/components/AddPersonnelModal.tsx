@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, UserPlus, AlertCircle } from 'lucide-react';
 import { api } from '../services/api.ts';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 
 interface AddPersonnelModalProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export const AddPersonnelModal: React.FC<AddPersonnelModalProps> = ({
   onUserAdded,
   factoryId
 }) => {
+  useLockBodyScroll(isOpen);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('TECHNICIAN');

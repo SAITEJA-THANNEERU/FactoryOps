@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import type { Machine } from '../types';
 import { api } from '../services/api';
 import { X, Sliders, Save, AlertCircle } from 'lucide-react';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 
 interface ConfigureThresholdsModalProps {
   isOpen: boolean;
@@ -16,6 +17,8 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
   machine,
   onSuccess
 }) => {
+  useLockBodyScroll(isOpen);
+
   const [maxTemp, setMaxTemp] = useState<number>(75);
   const [maxVib, setMaxVib] = useState<number>(3.5);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,8 +53,8 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full p-6 text-slate-800 shadow-xl space-y-4">
+    <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-hidden animate-in fade-in duration-200">
+      <div className="bg-white border border-slate-200 rounded-2xl max-w-md w-full p-6 text-slate-800 shadow-2xl space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-slate-200">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-200">
@@ -62,7 +65,7 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
               <p className="text-xs text-slate-500">{machine.name} ({machine.machine_id})</p>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1 rounded-md">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -85,7 +88,7 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
               required
               value={maxTemp}
               onChange={e => setMaxTemp(parseFloat(e.target.value) || 0)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-md p-2 text-slate-900 focus:outline-hidden focus:border-indigo-600 font-mono"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:outline-hidden focus:border-[#0E79B2] font-mono"
             />
             <p className="text-[11px] text-slate-500 mt-1">
               Telemetry exceeding this limit triggers automated yellow/red warning alerts.
@@ -102,7 +105,7 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
               required
               value={maxVib}
               onChange={e => setMaxVib(parseFloat(e.target.value) || 0)}
-              className="w-full bg-slate-50 border border-slate-200 rounded-md p-2 text-slate-900 focus:outline-hidden focus:border-indigo-600 font-mono"
+              className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:outline-hidden focus:border-[#0E79B2] font-mono"
             />
             <p className="text-[11px] text-slate-500 mt-1">
               Vibration harmonics exceeding this value flag spindle/bearing alignment anomalies.
@@ -113,14 +116,14 @@ export const ConfigureThresholdsModal: React.FC<ConfigureThresholdsModalProps> =
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md font-medium transition-colors"
+              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md font-semibold flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-[#0E79B2] hover:bg-[#0c6799] text-white rounded-lg font-semibold flex items-center gap-1.5 transition-colors shadow-2xs disabled:opacity-50 cursor-pointer"
             >
               <Save className="w-3.5 h-3.5" />
               <span>{isSubmitting ? 'Saving...' : 'Save Thresholds'}</span>

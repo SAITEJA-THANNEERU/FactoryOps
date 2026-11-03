@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import type { Incident, Machine, TechnicianProfile, TechnicianRecommendationResult } from '../../types/index.ts';
 import { api } from '../../services/api.ts';
+import { useLockBodyScroll } from '../../utils/useLockBodyScroll.ts';
 import {
   Sparkles,
   User,
@@ -37,6 +38,7 @@ export const AssignTechnicianModal: React.FC<AssignTechnicianModalProps> = ({
   initialTechnicianId,
   onAssignSubmit
 }) => {
+  useLockBodyScroll(isOpen);
   const [selectedIncidentId, setSelectedIncidentId] = useState<string>(initialIncidentId || '');
   const [recommendation, setRecommendation] = useState<TechnicianRecommendationResult | null>(null);
   const [isLoadingRecommendation, setIsLoadingRecommendation] = useState<boolean>(false);

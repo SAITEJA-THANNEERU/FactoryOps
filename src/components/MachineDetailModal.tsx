@@ -24,6 +24,7 @@ import {
   formatWholeNumber,
   formatScrap
 } from '../utils/formatters.ts';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 
 interface MachineDetailModalProps {
   machine: Machine | null;
@@ -46,6 +47,7 @@ export const MachineDetailModal: React.FC<MachineDetailModalProps> = ({
   onDelete,
   onStatusChange
 }) => {
+  useLockBodyScroll(Boolean(machine));
   if (!machine) return null;
 
   const machineIncidents = incidents.filter(i => i.machine_id === machine.machine_id);

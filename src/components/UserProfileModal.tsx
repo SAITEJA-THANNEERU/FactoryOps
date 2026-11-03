@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 import {
   X,
   User,
@@ -21,6 +22,7 @@ interface UserProfileModalProps {
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({ isOpen, onClose }) => {
   const { user, activeFactory, logout } = useAuth();
+  useLockBodyScroll(isOpen && Boolean(user));
   const modalRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

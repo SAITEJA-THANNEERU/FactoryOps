@@ -12,6 +12,7 @@ import {
   AlertTriangle,
   RotateCcw
 } from 'lucide-react';
+import { useLockBodyScroll } from '../../utils/useLockBodyScroll.ts';
 
 interface VerifyResolutionModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const VerifyResolutionModal: React.FC<VerifyResolutionModalProps> = ({
   assignment,
   onVerifySubmit
 }) => {
+  useLockBodyScroll(isOpen && Boolean(assignment));
   const [decision, setDecision] = useState<'APPROVE' | 'REJECT'>('APPROVE');
   const [qualityRating, setQualityRating] = useState<number>(5);
   const [verificationNotes, setVerificationNotes] = useState<string>(

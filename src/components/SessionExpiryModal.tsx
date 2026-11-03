@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, RefreshCw, LogOut, ShieldAlert } from 'lucide-react';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 
 interface SessionExpiryModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const SessionExpiryModal: React.FC<SessionExpiryModalProps> = ({
   onLogout,
   isExtending
 }) => {
+  useLockBodyScroll(isOpen);
   if (!isOpen) return null;
 
   const minutes = Math.floor(timeLeftSeconds / 60);

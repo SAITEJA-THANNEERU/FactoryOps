@@ -16,6 +16,7 @@ import {
   Globe,
   RefreshCw
 } from 'lucide-react';
+import { useLockBodyScroll } from '../../utils/useLockBodyScroll.ts';
 
 interface LocationMapModalProps {
   isOpen: boolean;
@@ -93,6 +94,7 @@ export const LocationMapModal: React.FC<LocationMapModalProps> = ({
   onLocationSaved,
   currentLocation
 }) => {
+  useLockBodyScroll(isOpen);
   const { activeFactory } = useAuth();
 
   const [lat, setLat] = useState<number>(currentLocation?.latitude || 17.4435);

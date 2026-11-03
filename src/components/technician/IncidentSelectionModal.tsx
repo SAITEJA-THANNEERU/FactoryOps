@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { SeverityBadge } from '../SeverityBadge.tsx';
 import { StatusBadge } from '../StatusBadge.tsx';
+import { useLockBodyScroll } from '../../utils/useLockBodyScroll.ts';
 
 interface IncidentSelectionModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export const IncidentSelectionModal: React.FC<IncidentSelectionModalProps> = ({
   title = 'Select Incident for Technician Repair Assignment',
   subtitle = 'Choose an operational equipment stoppage or quality deviation to analyze root cause and dispatch a specialized technician.'
 }) => {
+  useLockBodyScroll(isOpen);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSeverity, setFilterSeverity] = useState<string>('ALL');
   const [filterAssignmentStatus, setFilterAssignmentStatus] = useState<'ALL' | 'UNASSIGNED' | 'ASSIGNED'>('UNASSIGNED');

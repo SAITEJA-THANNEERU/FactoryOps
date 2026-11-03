@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 
 import { formatNumber, formatWholeNumber, formatCompactNumber, safeNumber } from '../../utils/formatters.ts';
+import { useFilters } from '../../contexts/FilterContext.tsx';
+import { useLockBodyScroll } from '../../utils/useLockBodyScroll.ts';
 
 /**
  * Power BI Executive & Operational Number Formatter
@@ -79,6 +81,18 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
   onFilterClick,
   actions
 }) => {
+  const {
+    selectedLine,
+    setSelectedLine,
+    selectedShift,
+    setSelectedShift,
+    selectedStatus,
+    setSelectedStatus,
+    timeRange,
+    setTimeRange,
+    resetFilters
+  } = useFilters();
+
   const [isFilterActive, setIsFilterActive] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
@@ -102,12 +116,6 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
     setIsFilterActive(prev => !prev);
     if (onFilterClick) {
       onFilterClick();
-    } else {
-      // Find filter bar on page and scroll smoothly or highlight
-      const filterBar = document.querySelector('.bg-white.border.border-slate-200.rounded-xl') || document.querySelector('select');
-      if (filterBar) {
-        filterBar.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }
     }
   };
 
@@ -165,132 +173,229 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
   };
 
   return (
-    <div className={`w-full bg-white border border-[#191923]/10 rounded-xl px-4 py-2.5 mb-2 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
-      isFocusMode ? 'ring-2 ring-[#0E79B2] shadow-lg' : ''
-    }`}>
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2">
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#191923]">
-            {title}
-          </h1>
-          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-            <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isRefreshing ? 'animate-spin' : 'animate-pulse'}`}></span>
-            <span>{isRefreshing ? 'Syncing...' : 'Live Data'}</span>
-          </span>
-          {isFocusMode && (
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#0E79B2] border border-blue-200">
-              Focus Mode
+    <div className="w-full mb-2">
+      <div className={`w-full bg-white border border-[#191923]/10 rounded-xl px-4 py-2.5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition-all ${
+        isFocusMode ? 'ring-2 ring-[#0E79B2] shadow-lg' : ''
+      }`}>
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg sm:text-xl font-bold tracking-tight text-[#191923]">
+              {title}
+            </h1>
+            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className={`w-1.5 h-1.5 rounded-full bg-emerald-500 ${isRefreshing ? 'animate-spin' : 'animate-pulse'}`}></span>
+              <span>{isRefreshing ? 'Syncing...' : 'Live Data'}</span>
             </span>
-          )}
-        </div>
-        <p className="text-[11.5px] text-slate-500 font-medium">
-          {subtitle}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 relative">
-        {actions}
-        <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200/80">
-          {/* Button 1: Toggle Filter Pane */}
-          <button
-            onClick={handleFilterToggle}
-            className={`p-1.5 rounded transition-colors cursor-pointer relative ${
-              isFilterActive
-                ? 'bg-[#0E79B2] text-white shadow-2xs'
-                : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
-            }`}
-            title="Toggle Operational Filter Pane"
-            aria-label="Toggle Filter Pane"
-          >
-            <Filter className="w-3.5 h-3.5" />
-            {isFilterActive && (
-              <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            {isFocusMode && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#0E79B2] border border-blue-200">
+                Focus Mode
+              </span>
             )}
-          </button>
+          </div>
+          <p className="text-[11.5px] text-slate-500 font-medium">
+            {subtitle}
+          </p>
+        </div>
 
-          {/* Button 2: Focus Mode */}
-          <button
-            onClick={handleFocusModeToggle}
-            className={`p-1.5 rounded transition-colors cursor-pointer ${
-              isFocusMode
-                ? 'bg-[#191923] text-white shadow-2xs'
-                : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
-            }`}
-            title={isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
-            aria-label="Focus Mode"
-          >
-            {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          </button>
-
-          {/* Button 3: Dashboard Options Dropdown */}
-          <div className="relative" ref={optionsRef}>
+        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 relative">
+          {actions}
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200/80">
+            {/* Button 1: Toggle Filter Pane */}
             <button
-              onClick={() => setIsOptionsOpen(prev => !prev)}
-              className={`p-1.5 rounded transition-colors cursor-pointer ${
-                isOptionsOpen
-                  ? 'bg-slate-200 text-slate-900'
+              onClick={handleFilterToggle}
+              className={`p-1.5 rounded transition-colors cursor-pointer relative ${
+                isFilterActive || selectedLine !== 'all' || selectedShift !== 'all' || selectedStatus !== 'all'
+                  ? 'bg-[#0E79B2] text-white shadow-2xs'
                   : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
               }`}
-              title="Dashboard Options & Actions"
-              aria-label="Dashboard Options"
+              title="Toggle Operational Filter Pane"
+              aria-label="Toggle Filter Pane"
             >
-              <MoreHorizontal className="w-3.5 h-3.5" />
+              <Filter className="w-3.5 h-3.5" />
+              {(isFilterActive || selectedLine !== 'all' || selectedShift !== 'all' || selectedStatus !== 'all') && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+              )}
             </button>
 
-            {/* Options Dropdown Menu */}
-            {isOptionsOpen && (
-              <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
-                  Dashboard Actions
+            {/* Button 2: Focus Mode */}
+            <button
+              onClick={handleFocusModeToggle}
+              className={`p-1.5 rounded transition-colors cursor-pointer ${
+                isFocusMode
+                  ? 'bg-[#191923] text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
+              }`}
+              title={isFocusMode ? 'Exit Focus Mode' : 'Enter Focus Mode'}
+              aria-label="Focus Mode"
+            >
+              {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+
+            {/* Button 3: Dashboard Options Dropdown */}
+            <div className="relative" ref={optionsRef}>
+              <button
+                onClick={() => setIsOptionsOpen(prev => !prev)}
+                className={`p-1.5 rounded transition-colors cursor-pointer ${
+                  isOptionsOpen
+                    ? 'bg-slate-200 text-slate-900'
+                    : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
+                }`}
+                title="Dashboard Options & Actions"
+                aria-label="Dashboard Options"
+              >
+                <MoreHorizontal className="w-3.5 h-3.5" />
+              </button>
+
+              {/* Options Dropdown Menu */}
+              {isOptionsOpen && (
+                <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-slate-200 rounded-xl shadow-xl z-50 py-1 text-xs text-slate-800 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 font-bold text-[10px] uppercase tracking-wider text-slate-400 border-b border-slate-100">
+                    Dashboard Actions
+                  </div>
+
+                  <button
+                    onClick={handleExportCsv}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
+                  >
+                    <Download className="w-3.5 h-3.5 text-[#0E79B2]" />
+                    <span>Export CSV Telemetry</span>
+                  </button>
+
+                  <button
+                    onClick={handleRefreshFeed}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isRefreshing ? 'animate-spin' : ''}`} />
+                    <span>Refresh Live Stream</span>
+                  </button>
+
+                  <button
+                    onClick={handlePrintReport}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Print Executive Summary</span>
+                  </button>
+
+                  <div className="border-t border-slate-100 my-1"></div>
+
+                  <button
+                    onClick={handleCopyLink}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700 font-bold">Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Share2 className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Share Dashboard URL</span>
+                      </>
+                    )}
+                  </button>
                 </div>
-
-                <button
-                  onClick={handleExportCsv}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
-                >
-                  <Download className="w-3.5 h-3.5 text-[#0E79B2]" />
-                  <span>Export CSV Telemetry</span>
-                </button>
-
-                <button
-                  onClick={handleRefreshFeed}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 text-emerald-600 ${isRefreshing ? 'animate-spin' : ''}`} />
-                  <span>Refresh Live Stream</span>
-                </button>
-
-                <button
-                  onClick={handlePrintReport}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
-                >
-                  <Printer className="w-3.5 h-3.5 text-purple-600" />
-                  <span>Print Executive Summary</span>
-                </button>
-
-                <div className="border-t border-slate-100 my-1"></div>
-
-                <button
-                  onClick={handleCopyLink}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 cursor-pointer font-medium text-slate-700"
-                >
-                  {copied ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700 font-bold">Link Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <Share2 className="w-3.5 h-3.5 text-amber-600" />
-                      <span>Share Dashboard URL</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Operational Filter Drawer Panel */}
+      {isFilterActive && (
+        <div className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 mb-3 shadow-inner animate-in fade-in slide-in-from-top-2 duration-150">
+          <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
+            <div className="flex items-center gap-2">
+              <Filter className="w-3.5 h-3.5 text-[#0E79B2]" />
+              <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                Operational Filter Console
+              </span>
+            </div>
+            <button
+              onClick={() => setIsFilterActive(false)}
+              className="text-slate-400 hover:text-slate-700 p-1 rounded-md text-xs font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
+            <div>
+              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Production Line</label>
+              <select
+                value={selectedLine}
+                onChange={e => setSelectedLine(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
+              >
+                <option value="all">All Lines</option>
+                <option value="Line 1 - Machining">Line 1 - Machining</option>
+                <option value="Line 2 - Assembly">Line 2 - Assembly</option>
+                <option value="Line 3 - Quality">Line 3 - Quality</option>
+                <option value="Line 4 - Coating">Line 4 - Coating</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Shift</label>
+              <select
+                value={selectedShift}
+                onChange={e => setSelectedShift(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
+              >
+                <option value="all">All Shifts</option>
+                <option value="A">Shift A (Morning)</option>
+                <option value="B">Shift B (Afternoon)</option>
+                <option value="C">Shift C (Night)</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Equipment Status</label>
+              <select
+                value={selectedStatus}
+                onChange={e => setSelectedStatus(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
+              >
+                <option value="all">All Statuses</option>
+                <option value="running">Running</option>
+                <option value="warning">Warning</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="offline">Offline</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Telemetry Period</label>
+              <select
+                value={timeRange}
+                onChange={e => setTimeRange(e.target.value)}
+                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
+              >
+                <option value="24h">Last 24 Hours</option>
+                <option value="7d">Last 7 Days</option>
+                <option value="30d">Last 30 Days</option>
+                <option value="ytd">Year to Date</option>
+              </select>
+            </div>
+
+            <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-end justify-between lg:justify-end gap-2 pt-1">
+              <button
+                onClick={resetFilters}
+                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+              <button
+                onClick={() => setIsFilterActive(false)}
+                className="px-3 py-1.5 bg-[#0E79B2] hover:bg-[#0c6799] text-white rounded-lg font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -391,15 +496,7 @@ export const PowerBiVisualContainer: React.FC<PowerBiVisualContainerProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
 
   // Lock body scroll when Visual Focus Mode is active
-  useEffect(() => {
-    if (isExpanded) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
-    }
-  }, [isExpanded]);
+  useLockBodyScroll(isExpanded);
 
   // Escape key listener to close Visual Focus Mode
   useEffect(() => {

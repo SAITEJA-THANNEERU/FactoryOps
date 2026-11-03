@@ -22,6 +22,7 @@ import {
   Copy
 } from 'lucide-react';
 import { formatNumber, formatDuration } from '../utils/formatters.ts';
+import { useLockBodyScroll } from '../utils/useLockBodyScroll.ts';
 
 interface Message {
   id: string;
@@ -43,6 +44,7 @@ const QUICK_PROMPTS = [
 ];
 
 export const AIChatModal: React.FC<AIChatModalProps> = ({ isOpen, onClose }) => {
+  useLockBodyScroll(isOpen);
   const { user, activeFactory } = useAuth();
   const { machines, incidents, workOrders, kpis } = useData();
 
