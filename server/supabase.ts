@@ -2160,11 +2160,20 @@ export const supabaseAdapter = {
           query = query.eq('is_read', false);
         }
         const { data, error } = await query.order('created_at', { ascending: false });
-        if (!error && data && data.length > 0) {
-          return db.getNotifications(userId, role, fId, filter as any);
+        if (!error && data) {
+          const filtered = data.filter((n: any) => {
+            if (role === 'SUPER_ADMIN') return true;
+            if (role === 'TECHNICIAN') {
+              if (n.recipient_user_id) return n.recipient_user_id === userId;
+              return n.recipient_role === 'TECHNICIAN' || n.recipient_role === 'ALL';
+            }
+            if (n.recipient_user_id) return n.recipient_user_id === userId;
+            return n.recipient_role === role || n.recipient_role === 'ALL';
+          });
+          return filtered as AppNotification[];
         }
       } catch {
-        // Fallback to in-memory/persistent store
+        // Fallback to local store on error
       }
     }
     return db.getNotifications(userId, role, fId, filter as any);
