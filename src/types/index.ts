@@ -642,4 +642,55 @@ export interface TechnicianRecommendationResult {
   }>;
 }
 
+export type NotificationPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
 
+export type NotificationType =
+  | 'incident'
+  | 'work_order'
+  | 'technician_assignment'
+  | 'repair_verification'
+  | 'repair_update'
+  | 'machine_failure'
+  | 'machine_telemetry'
+  | 'production_shortfall'
+  | 'production_delay'
+  | 'inventory_shortage'
+  | 'security_event'
+  | 'system_health'
+  | 'user_activity'
+  | 'INCIDENT_CRITICAL'
+  | 'INCIDENT_NEW'
+  | 'ASSIGNMENT_NEW'
+  | 'ASSIGNMENT_UPDATED'
+  | 'ASSIGNMENT_ACCEPTED'
+  | 'ASSIGNMENT_REJECTED'
+  | 'REASSIGNMENT_REQUESTED'
+  | 'REPAIR_VERIFICATION_PENDING'
+  | 'REPAIR_VERIFIED'
+  | 'REPAIR_REWORK_REQUIRED'
+  | 'MACHINE_DOWNTIME'
+  | 'MACHINE_STATUS_CHANGE'
+  | 'WORK_ORDER_NEW'
+  | 'WORK_ORDER_UPDATE'
+  | 'SECURITY_EVENT'
+  | 'PRODUCTION_SHORTFALL'
+  | 'SYSTEM_HEALTH'
+  | (string & {});
+
+export interface AppNotification {
+  id: string;
+  recipient_user_id?: string | null;
+  recipient_role?: UserRole | 'ALL' | string;
+  factory_id: string;
+  title: string;
+  message: string;
+  notification_type: NotificationType;
+  priority: NotificationPriority;
+  related_module: string;
+  related_record_id?: string;
+  target_path: string;
+  is_read: boolean;
+  created_at: string;
+  read_at?: string | null;
+  meta?: string;
+}

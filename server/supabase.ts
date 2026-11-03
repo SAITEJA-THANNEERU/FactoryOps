@@ -19,7 +19,8 @@ import type {
   TechnicianIncidentAssignment,
   RepairProgressUpdate,
   IncidentResolutionSubmission,
-  IncidentVerificationDetails
+  IncidentVerificationDetails,
+  AppNotification
 } from '../src/types/index.ts';
 
 dotenv.config({ override: true });
@@ -2144,6 +2145,88 @@ export const supabaseAdapter = {
       syncedCounts: counts,
       errors
     };
+  },
+
+  // --- ROLE-BASED NOTIFICATIONS ---
+  async getNotifications(userId: string, role: string, factoryId?: string, filter?: 'all' | 'unread' | string): Promise<AppNotification[]> {
+    const fId = factoryId || 'FAC-001';
+    if (supabaseStatus.isHealthy) {
+      try {
+        let query = supabase.from('notifications').select('*');
+        if (role !== 'SUPER_ADMIN') {
+          query = query.eq('factory_id', fId);
+        }
+        if (filter === 'unread') {
+          query = query.eq('is_read', false);
+        }
+        const { data, error } = await query.order('created_at', { ascending: false });
+        if (!error && data && data.length > 0) {
+          return db.getNotifications(userId, role, fId, filter as any);
+        }
+      } catch {
+        // Fallback to in-memory/persistent store
+      }
+    }
+    return db.getNotifications(userId, role, fId, filter as any);
+  },
+
+  async createNotification(data: Omit<AppNotification, 'id' | 'created_at' | 'is_read'>): Promise<{
+    notification: AppNotification;
+    syncedToSupabase: boolean;
+  }> {
+    const notification = db.createNotification(data);
+    let synced = false;
+    if (supabaseStatus.isHealthy) {
+      try {
+        const { error } = await supabase.from('notifications').insert(notification);
+        synced = !error;
+      } catch {
+        synced = false;
+      }
+    }
+    return { notification, syncedToSupabase: synced };
+  },
+
+  async markNotificationAsRead(id: string, userId: string, role: string): Promise<boolean> {
+    const success = db.markNotificationAsRead(id, userId, role);
+    if (success && supabaseStatus.isHealthy) {
+      try {
+        await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('id', id);
+      } catch {
+        // Continue
+      }
+    }
+    return success;
+  },
+
+  async markAllNotificationsAsRead(userId: string, role: string, factoryId?: string): Promise<string[]> {
+    const fId = factoryId || 'FAC-001';
+    const markedIds = db.markAllNotificationsAsRead(userId, role, fId);
+    if (markedIds.length > 0 && supabaseStatus.isHealthy) {
+      try {
+        if (role === 'SUPER_ADMIN') {
+          await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('is_read', false);
+        } else {
+          await supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).eq('factory_id', fId).eq('is_read', false);
+        }
+      } catch {
+        // Continue
+      }
+    }
+    return markedIds;
+  },
+
+  async clearNotification(id: string, userId: string, role: string): Promise<boolean> {
+    const success = db.clearNotification(id, userId, role);
+    if (success && supabaseStatus.isHealthy) {
+      try {
+        await supabase.from('notifications').delete().eq('id', id);
+      } catch {
+        // Continue
+      }
+    }
+    return success;
   }
 };
+
 

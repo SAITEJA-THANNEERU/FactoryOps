@@ -18,7 +18,8 @@ import type {
   SystemAuditLog,
   TechnicianProfile,
   TechnicianIncidentAssignment,
-  TechnicianRecommendationResult
+  TechnicianRecommendationResult,
+  AppNotification
 } from '../types/index.ts';
 
 const TOKEN_KEY = 'factoryops_auth_token';
@@ -81,6 +82,12 @@ class ApiService {
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
+      if (response.status === 403) {
+        throw new Error(`Forbidden: You do not have permission to access '${endpoint}' (403)`);
+      }
+      if (response.status === 401) {
+        throw new Error('Session expired or unauthorized');
+      }
       // If response is HTML or non-JSON
       if (text.trim().startsWith('<')) {
         throw new Error(
@@ -364,7 +371,14 @@ class ApiService {
   public dataQuality = {
     getAll: async (factoryId?: string): Promise<DataQualityMetric[]> => {
       const q = factoryId ? `?factory_id=${encodeURIComponent(factoryId)}` : '';
-      return this.request<DataQualityMetric[]>(`/api/data-quality${q}`);
+      try {
+        return await this.request<DataQualityMetric[]>(`/api/data-quality${q}`);
+      } catch (err: any) {
+        if (err?.message?.includes('403') || err?.message?.includes('Forbidden') || err?.message?.includes('not authorized')) {
+          return [];
+        }
+        throw err;
+      }
     }
   };
 
@@ -388,34 +402,34 @@ class ApiService {
 
   // --- Notifications ---
   public notifications = {
-    getAll: async () => {
+    getAll: async (filter: 'all' | 'unread' | 'read' = 'all') => {
       return this.request<{
-        notifications: Array<{
-          id: string;
-          type: 'incident' | 'work_order' | 'machine';
-          title: string;
-          description: string;
-          timestamp: string;
-          severity?: string;
-          targetPath: string;
-          read: boolean;
-          meta: string;
-        }>;
+        notifications: AppNotification[];
         unreadCount: number;
         readIds: string[];
-      }>('/api/notifications');
+      }>(`/api/notifications?filter=${filter}`);
     },
     markRead: async (idOrIds: string | string[]) => {
       const payload = typeof idOrIds === 'string' ? { id: idOrIds } : { ids: idOrIds };
-      return this.request<{ success: boolean; readIds: string[] }>('/api/notifications/mark-read', {
+      return this.request<{ success: boolean; markedReadIds: string[] }>('/api/notifications/mark-read', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
     },
-    markAllRead: async (ids?: string[]) => {
-      return this.request<{ success: boolean; unreadCount: number; readIds: string[] }>('/api/notifications/mark-all-read', {
+    markAllRead: async () => {
+      return this.request<{ success: boolean; unreadCount: number; markedReadIds: string[] }>('/api/notifications/mark-all-read', {
+        method: 'POST'
+      });
+    },
+    delete: async (id: string) => {
+      return this.request<{ success: boolean; id: string }>(`/api/notifications/${id}`, {
+        method: 'DELETE'
+      });
+    },
+    create: async (data: Partial<AppNotification>) => {
+      return this.request<AppNotification>('/api/notifications', {
         method: 'POST',
-        body: JSON.stringify({ ids })
+        body: JSON.stringify(data)
       });
     }
   };

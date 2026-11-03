@@ -12,7 +12,13 @@ import {
 } from '../utils/formatters.ts';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
+import { useAuth } from '../contexts/AuthContext.tsx';
+
 export const ProductionPage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role ? ['ADMIN', 'FACTORY_OWNER', 'SUPER_ADMIN'].includes(user.role) : false;
+  const canLogProduction = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'PRODUCTION_PLANNER', 'ANALYST'].includes(user.role) : false;
+
   const { production, machines, kpis, createProductionRecord, deleteProductionRecord } = useData();
   const { selectedShift, selectedLine, searchQuery } = useFilters();
   const { highlightId, isHighlighted, highlightRef, highlightClass } = useSearchHighlight();
@@ -102,13 +108,15 @@ export const ProductionPage: React.FC = () => {
             Shift-by-shift output, scrap generation, and cycle time performance
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>Log Shift Output</span>
-        </button>
+        {canLogProduction && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors self-start sm:self-auto cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Log Shift Output</span>
+          </button>
+        )}
       </div>
 
       <GlobalFilterBar />
@@ -206,14 +214,16 @@ export const ProductionPage: React.FC = () => {
                     <td className="py-2.5 px-4">{formatNumber(p.cycle_time_sec ?? 45, 1)}s</td>
                     <td className="py-2.5 px-4 text-slate-600">{p.operator || (p as any).operator_name || 'Plant Operator'}</td>
                     <td className="py-2.5 px-4 text-right">
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        disabled={deletingId === p.id}
-                        title="Delete record"
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(p.id)}
+                          disabled={deletingId === p.id}
+                          title="Delete record"
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

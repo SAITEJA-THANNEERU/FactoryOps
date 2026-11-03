@@ -22,9 +22,14 @@ import {
   Sliders
 } from 'lucide-react';
 import { formatNumber, formatPercent } from '../utils/formatters.ts';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
 export const MachinesPage: React.FC = () => {
+  const { user } = useAuth();
+  const canManage = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR'].includes(user.role) : false;
+  const canDelete = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER'].includes(user.role) : false;
+  const canChangeStatus = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR'].includes(user.role) : false;
   const {
     machines,
     incidents,
@@ -183,13 +188,15 @@ export const MachinesPage: React.FC = () => {
             <span className="hidden sm:inline">Export CSV</span>
           </button>
 
-          <button
-            onClick={handleOpenAdd}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Add Machine</span>
-          </button>
+          {canManage && (
+            <button
+              onClick={handleOpenAdd}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold rounded-lg text-xs transition-colors shadow-xs cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Machine</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -219,17 +226,21 @@ export const MachinesPage: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                  <select
-                    value={m.status}
-                    onChange={e => handleStatusChange(m.machine_id || m.id, e.target.value, e)}
-                    className="text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded px-1.5 py-0.5 cursor-pointer focus:outline-hidden"
-                    title="Change Status"
-                  >
-                    <option value="running">🟢 Running</option>
-                    <option value="warning">🟡 Warning</option>
-                    <option value="maintenance">🟠 Maintenance</option>
-                    <option value="offline">⚪ Offline</option>
-                  </select>
+                  {canChangeStatus ? (
+                    <select
+                      value={m.status}
+                      onChange={e => handleStatusChange(m.machine_id || m.id, e.target.value, e)}
+                      className="text-[11px] font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded px-1.5 py-0.5 cursor-pointer focus:outline-hidden"
+                      title="Change Status"
+                    >
+                      <option value="running">🟢 Running</option>
+                      <option value="warning">🟡 Warning</option>
+                      <option value="maintenance">🟠 Maintenance</option>
+                      <option value="offline">⚪ Offline</option>
+                    </select>
+                  ) : (
+                    <StatusBadge status={m.status} size="sm" />
+                  )}
                 </div>
               </div>
 
@@ -246,30 +257,36 @@ export const MachinesPage: React.FC = () => {
 
                 {/* Threshold, Edit & Delete Action Buttons */}
                 <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity" onClick={e => e.stopPropagation()}>
-                  <button
-                    onClick={e => {
-                      e.stopPropagation();
-                      setThresholdMachine(m);
-                    }}
-                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
-                    title="Configure alert thresholds"
-                  >
-                    <Sliders className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={e => handleOpenEdit(m, e)}
-                    className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
-                    title="Edit machine specifications"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={e => handleOpenDelete(m, e)}
-                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
-                    title="Delete machine"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {canManage && (
+                    <>
+                      <button
+                        onClick={e => {
+                          e.stopPropagation();
+                          setThresholdMachine(m);
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
+                        title="Configure alert thresholds"
+                      >
+                        <Sliders className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={e => handleOpenEdit(m, e)}
+                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded transition-colors"
+                        title="Edit machine specifications"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </>
+                  )}
+                  {canDelete && (
+                    <button
+                      onClick={e => handleOpenDelete(m, e)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors"
+                      title="Delete machine"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
 

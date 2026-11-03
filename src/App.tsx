@@ -27,7 +27,8 @@ import { InventoryPage } from './pages/InventoryPage.tsx';
 import { AttendanceHubPage } from './pages/AttendanceHubPage.tsx';
 import { AIChatLauncher } from './components/AIChatLauncher.tsx';
 
-import { RefreshCw, Factory as FactoryIcon } from 'lucide-react';
+import { RefreshCw, Factory as FactoryIcon, ShieldAlert } from 'lucide-react';
+import { isRouteAllowedForRole } from './utils/rbac.ts';
 
 const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, inspectingFactory } = useAuth();
@@ -56,6 +57,13 @@ const AppContent: React.FC = () => {
       } else {
         // Non-super-admin roles must NEVER access /super-admin routes or auth pages
         if (currentPath.startsWith('/super-admin') || currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
+          navigate('/dashboard');
+          return;
+        }
+
+        // Strict RBAC: If role is not authorized for current route, redirect to permitted Dashboard
+        if (!isRouteAllowedForRole(user.role, currentPath)) {
+          console.warn(`[RBAC] Access denied: User role '${user.role}' is not authorized to access '${currentPath}'. Redirecting to /dashboard.`);
           navigate('/dashboard');
         }
       }
@@ -97,6 +105,11 @@ const AppContent: React.FC = () => {
 
   // Factory Operational Console (for Factory Owner, Factory Manager, or Super Admin inspecting)
   const renderFactoryPage = () => {
+    // Defense-in-depth: if route is not permitted for the user's role, fallback to DashboardPage
+    if (user && !isRouteAllowedForRole(user.role, currentPath)) {
+      return <DashboardPage />;
+    }
+
     switch (currentPath) {
       case '/dashboard':
       case '/':

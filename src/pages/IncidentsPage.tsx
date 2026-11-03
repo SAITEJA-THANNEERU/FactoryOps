@@ -14,6 +14,8 @@ import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 export const IncidentsPage: React.FC = () => {
   const { user } = useAuth();
   const isManager = user?.role ? ['MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'ADMIN', 'FACTORY_OWNER', 'SUPER_ADMIN'].includes(user.role) : false;
+  const isAdmin = user?.role ? ['ADMIN', 'FACTORY_OWNER', 'SUPER_ADMIN'].includes(user.role) : false;
+  const canReport = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR'].includes(user.role) : false;
 
   const {
     incidents,
@@ -94,13 +96,15 @@ export const IncidentsPage: React.FC = () => {
               <span>AI Dispatch Hub</span>
             </button>
           )}
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Report Incident</span>
-          </button>
+          {canReport && (
+            <button
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Report Incident</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -203,14 +207,16 @@ export const IncidentsPage: React.FC = () => {
                         >
                           <CheckCircle className="w-3.5 h-3.5" />
                         </button>
-                        <button
-                          onClick={() => handleDelete(inc.id)}
-                          disabled={deletingId === inc.id}
-                          title="Delete incident"
-                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(inc.id)}
+                            disabled={deletingId === inc.id}
+                            title="Delete incident"
+                            className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>

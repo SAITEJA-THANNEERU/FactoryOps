@@ -19,7 +19,10 @@ import type {
   SparePart,
   SystemAuditLog,
   TechnicianProfile,
-  TechnicianIncidentAssignment
+  TechnicianIncidentAssignment,
+  AppNotification,
+  NotificationPriority,
+  NotificationType
 } from '../src/types/index.ts';
 
 // Haversine distance calculator (returns distance in meters between two lat/lon points)
@@ -78,6 +81,7 @@ class FactoryOpsDatabase {
   public systemAuditLogs: SystemAuditLog[] = [];
   public technicianProfiles: TechnicianProfile[] = [];
   public technicianAssignments: TechnicianIncidentAssignment[] = [];
+  public notifications: AppNotification[] = [];
   public readNotificationIds: Set<string> = new Set();
   public sessions: Map<string, { userId: string; role: string; factoryId: string | null; expiresAt: number }> = new Map();
 
@@ -112,7 +116,8 @@ class FactoryOpsDatabase {
         spareParts: this.spareParts,
         systemAuditLogs: this.systemAuditLogs,
         technicianProfiles: this.technicianProfiles,
-        technicianAssignments: this.technicianAssignments
+        technicianAssignments: this.technicianAssignments,
+        notifications: this.notifications
       };
       fs.writeFileSync(this.persistentFile, JSON.stringify(state, null, 2), 'utf8');
     } catch (err: any) {
@@ -214,8 +219,14 @@ class FactoryOpsDatabase {
             });
           }
 
+          if (Array.isArray(state.notifications) && state.notifications.length >= 10) {
+            this.notifications = state.notifications;
+          } else {
+            this.seedNotifications();
+          }
+
           this.persist();
-          console.log(`✅ [FactoryOpsDatabase] Single-Factory System (APEX): Loaded ${this.machines.length} machines, ${this.production.length} production runs, ${this.workOrders.length} work orders, ${this.users.length} users.`);
+          console.log(`✅ [FactoryOpsDatabase] Single-Factory System (APEX): Loaded ${this.machines.length} machines, ${this.production.length} production runs, ${this.workOrders.length} work orders, ${this.users.length} users, ${this.notifications.length} notifications.`);
           return true;
         }
       }
@@ -308,6 +319,7 @@ class FactoryOpsDatabase {
     this.seedSpareParts();
     this.seedTechnicianProfiles();
     this.seedTechnicianAssignments();
+    this.seedNotifications();
   }
 
   // --- SEED SPARE PARTS INVENTORY ---
@@ -3072,6 +3084,368 @@ class FactoryOpsDatabase {
       estimated_repair_hours: estHours,
       all_candidates: scoredCandidates
     };
+  }
+
+  // ==========================================
+  // ROLE-BASED NOTIFICATIONS METHODS
+  // ==========================================
+
+  public seedNotifications() {
+    this.notifications = [
+      // 1. SUPER ADMIN NOTIFICATIONS
+      {
+        id: 'NOTIF-SA-001',
+        recipient_user_id: null,
+        recipient_role: 'SUPER_ADMIN',
+        factory_id: 'FAC-001',
+        title: 'Platform Security Event Logged',
+        message: 'Security Audit: Administrative and role access events recorded across enterprise nodes.',
+        notification_type: 'security_event',
+        priority: 'HIGH',
+        related_module: 'security',
+        related_record_id: 'SEC-LOG-901',
+        target_path: '/super-admin/overview',
+        is_read: false,
+        created_at: new Date(Date.now() - 25 * 60000).toISOString(),
+        meta: 'System Security • Global Governance'
+      },
+      {
+        id: 'NOTIF-SA-002',
+        recipient_user_id: null,
+        recipient_role: 'SUPER_ADMIN',
+        factory_id: 'FAC-001',
+        title: 'Critical Enterprise Telemetry Warning',
+        message: 'Spindle vibration runaway flagged on APX-CNC-01 at Apex Precision Manufacturing.',
+        notification_type: 'incident',
+        priority: 'CRITICAL',
+        related_module: 'incidents',
+        related_record_id: 'INC-2026-001',
+        target_path: '/incidents',
+        is_read: false,
+        created_at: new Date(Date.now() - 40 * 60000).toISOString(),
+        meta: 'Apex APX-01 • Critical Fleet Alarm'
+      },
+      {
+        id: 'NOTIF-SA-003',
+        recipient_user_id: null,
+        recipient_role: 'SUPER_ADMIN',
+        factory_id: 'FAC-002',
+        title: 'Cross-Factory Operational Sync',
+        message: 'Nova Industrial plant reports 92.4% target output compliance on morning shift.',
+        notification_type: 'system_health',
+        priority: 'LOW',
+        related_module: 'system',
+        related_record_id: 'FAC-002',
+        target_path: '/super-admin/overview',
+        is_read: true,
+        created_at: new Date(Date.now() - 180 * 60000).toISOString(),
+        read_at: new Date(Date.now() - 100 * 60000).toISOString(),
+        meta: 'Nova Plant • Shift Status'
+      },
+
+      // 2. ADMIN NOTIFICATIONS (Apex Precision FAC-001)
+      {
+        id: 'NOTIF-ADM-001',
+        recipient_user_id: null,
+        recipient_role: 'ADMIN',
+        factory_id: 'FAC-001',
+        title: 'Critical Machine Breakdown (Spindle Runaway)',
+        message: 'APX-CNC-01 reached 4.8 mm/s vibration threshold on Heavy Machining line.',
+        notification_type: 'machine_failure',
+        priority: 'CRITICAL',
+        related_module: 'machines',
+        related_record_id: 'APX-CNC-01',
+        target_path: '/machines',
+        is_read: false,
+        created_at: new Date(Date.now() - 35 * 60000).toISOString(),
+        meta: 'Machine Alert • Bay 1'
+      },
+      {
+        id: 'NOTIF-ADM-002',
+        recipient_user_id: null,
+        recipient_role: 'ADMIN',
+        factory_id: 'FAC-001',
+        title: 'Inventory Shortage: Critical Ceramic Bearing',
+        message: 'SKF-7014-ACD ceramic bearings at 3 units (reorder threshold is 5). Immediate replenishment recommended.',
+        notification_type: 'inventory_shortage',
+        priority: 'HIGH',
+        related_module: 'inventory',
+        related_record_id: 'PRT-1001',
+        target_path: '/inventory',
+        is_read: false,
+        created_at: new Date(Date.now() - 75 * 60000).toISOString(),
+        meta: 'Inventory • Low Stock'
+      },
+      {
+        id: 'NOTIF-ADM-003',
+        recipient_user_id: null,
+        recipient_role: 'ADMIN',
+        factory_id: 'FAC-001',
+        title: 'New Corrective Work Order Dispatched',
+        message: 'Work Order WO-2026-1024 issued for Bay 1 Hydraulic Maintenance.',
+        notification_type: 'work_order',
+        priority: 'MEDIUM',
+        related_module: 'work_orders',
+        related_record_id: 'WO-2026-1024',
+        target_path: '/work-orders',
+        is_read: true,
+        created_at: new Date(Date.now() - 210 * 60000).toISOString(),
+        read_at: new Date(Date.now() - 150 * 60000).toISOString(),
+        meta: 'Work Order • Bay 1'
+      },
+
+      // 3. MANAGER / SUPERVISOR NOTIFICATIONS
+      {
+        id: 'NOTIF-MGR-001',
+        recipient_user_id: null,
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: 'FAC-001',
+        title: 'Verification Required: Spindle Bearing Repair Completed',
+        message: 'Technician Ramesh Varma completed repair on Apex 5-Axis CNC Milling Center 01. Ready for supervisor inspection and quality sign-off.',
+        notification_type: 'repair_verification',
+        priority: 'HIGH',
+        related_module: 'incidents',
+        related_record_id: 'ACM-2026-001',
+        target_path: '/manager-dashboard',
+        is_read: false,
+        created_at: new Date(Date.now() - 15 * 60000).toISOString(),
+        meta: 'Verification Sign-Off • ACM-2026-001'
+      },
+      {
+        id: 'NOTIF-MGR-002',
+        recipient_user_id: null,
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: 'FAC-001',
+        title: 'High Severity Incident Requires Attention',
+        message: 'Hydraulic line pressure drop detected on Cylindrical Grinder M004. Incident reported by Operator.',
+        notification_type: 'incident',
+        priority: 'HIGH',
+        related_module: 'incidents',
+        related_record_id: 'INC-2026-002',
+        target_path: '/incidents',
+        is_read: false,
+        created_at: new Date(Date.now() - 55 * 60000).toISOString(),
+        meta: 'Incident Dispatch • INC-2026-002'
+      },
+      {
+        id: 'NOTIF-MGR-003',
+        recipient_user_id: null,
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: 'FAC-001',
+        title: 'Overdue Maintenance Task Notice',
+        message: 'Preventative spindle backlash calibration on M002 has exceeded target shift schedule.',
+        notification_type: 'work_order',
+        priority: 'MEDIUM',
+        related_module: 'work_orders',
+        related_record_id: 'WO-2026-1019',
+        target_path: '/work-orders',
+        is_read: true,
+        created_at: new Date(Date.now() - 240 * 60000).toISOString(),
+        read_at: new Date(Date.now() - 180 * 60000).toISOString(),
+        meta: 'Maintenance • Overdue'
+      },
+
+      // 4. PRODUCTION PLANNER NOTIFICATIONS
+      {
+        id: 'NOTIF-PLN-001',
+        recipient_user_id: null,
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        title: 'Production Target Deviation Alert',
+        message: 'Heavy Machining Line 1 output is running 16% below planned hourly target (122 vs 145 units/hr).',
+        notification_type: 'production_shortfall',
+        priority: 'HIGH',
+        related_module: 'production',
+        related_record_id: 'PRD-LINE-1',
+        target_path: '/production',
+        is_read: false,
+        created_at: new Date(Date.now() - 20 * 60000).toISOString(),
+        meta: 'Target Shortfall • Line 1'
+      },
+      {
+        id: 'NOTIF-PLN-002',
+        recipient_user_id: null,
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        title: 'Machine Downtime Impacting Shift Schedule',
+        message: 'CNC Milling Center 01 outage directly affects Batch #4102 shaft delivery timeline.',
+        notification_type: 'production_delay',
+        priority: 'HIGH',
+        related_module: 'production',
+        related_record_id: 'APX-CNC-01',
+        target_path: '/planner-dashboard',
+        is_read: false,
+        created_at: new Date(Date.now() - 50 * 60000).toISOString(),
+        meta: 'Schedule Impact • Batch #4102'
+      },
+      {
+        id: 'NOTIF-PLN-003',
+        recipient_user_id: null,
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        title: 'Machine Availability Update',
+        message: 'Vertical Machining Center M002 cleared for operation following coolant flush.',
+        notification_type: 'machine_telemetry',
+        priority: 'LOW',
+        related_module: 'machines',
+        related_record_id: 'M002',
+        target_path: '/machines',
+        is_read: true,
+        created_at: new Date(Date.now() - 300 * 60000).toISOString(),
+        read_at: new Date(Date.now() - 220 * 60000).toISOString(),
+        meta: 'Capacity Restored • M002'
+      },
+
+      // 5. TECHNICIAN NOTIFICATIONS (Assigned to Ramesh Varma USR-012)
+      {
+        id: 'NOTIF-TCH-001',
+        recipient_user_id: 'USR-012',
+        recipient_role: 'TECHNICIAN',
+        factory_id: 'FAC-001',
+        title: 'Action Required: Incident Assignment (Spindle Thermal Runaway)',
+        message: 'Assigned to incident ACM-2026-001 on Apex 5-Axis CNC Milling Center 01. Review diagnostics and accept or request reassignment.',
+        notification_type: 'technician_assignment',
+        priority: 'CRITICAL',
+        related_module: 'incidents',
+        related_record_id: 'ACM-2026-001',
+        target_path: '/technician-dashboard',
+        is_read: false,
+        created_at: new Date(Date.now() - 30 * 60000).toISOString(),
+        meta: 'Assigned by Amit Deshmukh • Due in 2.5 hrs'
+      },
+      {
+        id: 'NOTIF-TCH-002',
+        recipient_user_id: 'USR-012',
+        recipient_role: 'TECHNICIAN',
+        factory_id: 'FAC-001',
+        title: 'Upcoming Maintenance Deadline',
+        message: 'Scheduled spindle dynamic balance check on Bay 1 milling units due by end of shift.',
+        notification_type: 'work_order',
+        priority: 'MEDIUM',
+        related_module: 'work_orders',
+        related_record_id: 'WO-2026-1022',
+        target_path: '/work-orders',
+        is_read: false,
+        created_at: new Date(Date.now() - 80 * 60000).toISOString(),
+        meta: 'Scheduled Task • Bay 1'
+      },
+      {
+        id: 'NOTIF-TCH-003',
+        recipient_user_id: 'USR-012',
+        recipient_role: 'TECHNICIAN',
+        factory_id: 'FAC-001',
+        title: 'Repair Verification & Sign-Off Approved',
+        message: 'Supervisor Amit Deshmukh approved your spindle runout repair (Rating: 5/5 Stars). Machine cleared for production.',
+        notification_type: 'repair_verification',
+        priority: 'LOW',
+        related_module: 'incidents',
+        related_record_id: 'ACM-2026-005',
+        target_path: '/technician-dashboard',
+        is_read: true,
+        created_at: new Date(Date.now() - 360 * 60000).toISOString(),
+        read_at: new Date(Date.now() - 300 * 60000).toISOString(),
+        meta: 'Sign-Off Complete • 5/5 Stars'
+      }
+    ];
+  }
+
+  public getNotifications(userId: string, role: string, factoryId: string, filter?: 'all' | 'unread'): AppNotification[] {
+    let list = this.notifications.filter(n => {
+      // 1. Factory matching (Super Admin can see all, others only their factory)
+      if (role !== 'SUPER_ADMIN' && n.factory_id && n.factory_id !== factoryId) {
+        return false;
+      }
+
+      // 2. Role & Recipient matching
+      if (role === 'SUPER_ADMIN') {
+        return true;
+      }
+
+      if (role === 'TECHNICIAN') {
+        // Technicians only see notifications specifically addressed to them or broadcast to all technicians
+        if (n.recipient_user_id) {
+          return n.recipient_user_id === userId;
+        }
+        return n.recipient_role === 'TECHNICIAN' || n.recipient_role === 'ALL';
+      }
+
+      // For Admin, Manager, Production Planner:
+      if (n.recipient_user_id) {
+        return n.recipient_user_id === userId;
+      }
+      return n.recipient_role === role || n.recipient_role === 'ALL';
+    });
+
+    if (filter === 'unread') {
+      list = list.filter(n => !n.is_read);
+    }
+
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  }
+
+  public createNotification(data: Omit<AppNotification, 'id' | 'created_at' | 'is_read'>): AppNotification {
+    const newNotif: AppNotification = {
+      ...data,
+      id: `NOTIF-${Date.now()}-${Math.floor(100 + Math.random() * 900)}`,
+      created_at: new Date().toISOString(),
+      is_read: false
+    };
+    this.notifications.unshift(newNotif);
+    this.persist();
+    return newNotif;
+  }
+
+  public markNotificationAsRead(id: string, userId: string, role: string): boolean {
+    const notif = this.notifications.find(n => n.id === id);
+    if (!notif) return false;
+
+    // Security check: only recipient or matching role can mark as read
+    if (role !== 'SUPER_ADMIN') {
+      if (notif.recipient_user_id && notif.recipient_user_id !== userId) {
+        return false;
+      }
+      if (!notif.recipient_user_id && notif.recipient_role !== role && notif.recipient_role !== 'ALL') {
+        return false;
+      }
+    }
+
+    notif.is_read = true;
+    notif.read_at = new Date().toISOString();
+    this.readNotificationIds.add(id);
+    this.persist();
+    return true;
+  }
+
+  public markAllNotificationsAsRead(userId: string, role: string, factoryId: string): string[] {
+    const userNotifs = this.getNotifications(userId, role, factoryId, 'unread');
+    const now = new Date().toISOString();
+    const markedIds: string[] = [];
+    userNotifs.forEach(n => {
+      n.is_read = true;
+      n.read_at = now;
+      this.readNotificationIds.add(n.id);
+      markedIds.push(n.id);
+    });
+    if (markedIds.length > 0) this.persist();
+    return markedIds;
+  }
+
+  public clearNotification(id: string, userId: string, role: string): boolean {
+    const idx = this.notifications.findIndex(n => n.id === id);
+    if (idx === -1) return false;
+    const notif = this.notifications[idx];
+    if (role !== 'SUPER_ADMIN') {
+      if (notif.recipient_user_id && notif.recipient_user_id !== userId) {
+        return false;
+      }
+      if (!notif.recipient_user_id && notif.recipient_role !== role && notif.recipient_role !== 'ALL') {
+        return false;
+      }
+    }
+    this.notifications.splice(idx, 1);
+    this.persist();
+    return true;
   }
 }
 

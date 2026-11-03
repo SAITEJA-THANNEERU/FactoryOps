@@ -7,11 +7,19 @@ import { formatDuration } from '../utils/formatters.ts';
 import { ClipboardList, Plus, Trash2 } from 'lucide-react';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
+import { useAuth } from '../contexts/AuthContext.tsx';
+
 export const WorkOrdersPage: React.FC = () => {
+  const { user } = useAuth();
   const { workOrders, machines, createWorkOrder, updateWorkOrder, deleteWorkOrder } = useData();
   const { isHighlighted, highlightRef, highlightClass } = useSearchHighlight();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const canManageWorkOrders = user?.role
+    ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR'].includes(user.role)
+    : false;
+  const isTechnician = user?.role === 'TECHNICIAN' || user?.role === 'OPERATOR';
 
   const handleStatusChange = async (id: string, newStatus: any) => {
     try {
@@ -22,6 +30,7 @@ export const WorkOrdersPage: React.FC = () => {
   };
 
   const handleDelete = async (id: string) => {
+    if (!canManageWorkOrders) return;
     if (!window.confirm('Delete this work order permanently?')) return;
     setDeletingId(id);
     try {
@@ -45,13 +54,15 @@ export const WorkOrdersPage: React.FC = () => {
             Active technician assignments, parts requisitions, and completion sign-offs
           </p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-        >
-          <Plus className="w-3.5 h-3.5" />
-          <span>New Work Order</span>
-        </button>
+        {canManageWorkOrders && (
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Work Order</span>
+          </button>
+        )}
       </div>
 
       <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-xs">
@@ -97,24 +108,40 @@ export const WorkOrdersPage: React.FC = () => {
                     <td className="py-3 px-4">{formatDuration(wo.estimated_hours, 'h')}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <select
-                          value={wo.status}
-                          onChange={e => handleStatusChange(wo.id, e.target.value)}
-                          className="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 focus:outline-hidden focus:border-emerald-600"
-                        >
-                          <option value="Pending">Pending</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Completed">Completed</option>
-                          <option value="Cancelled">Cancelled</option>
-                        </select>
-                        <button
-                          onClick={() => handleDelete(wo.id)}
-                          disabled={deletingId === wo.id}
-                          title="Delete work order"
-                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        {canManageWorkOrders ? (
+                          <>
+                            <select
+                              value={wo.status}
+                              onChange={e => handleStatusChange(wo.id, e.target.value)}
+                              className="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 focus:outline-hidden focus:border-emerald-600"
+                            >
+                              <option value="Pending">Pending</option>
+                              <option value="In Progress">In Progress</option>
+                              <option value="Completed">Completed</option>
+                              <option value="Cancelled">Cancelled</option>
+                            </select>
+                            <button
+                              onClick={() => handleDelete(wo.id)}
+                              disabled={deletingId === wo.id}
+                              title="Delete work order"
+                              className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        ) : isTechnician ? (
+                          <select
+                            value={wo.status}
+                            onChange={e => handleStatusChange(wo.id, e.target.value)}
+                            disabled={Boolean(wo.assigned_to && user?.name && !wo.assigned_to.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]))}
+                            className="bg-slate-50 border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 focus:outline-hidden focus:border-emerald-600 disabled:opacity-50"
+                          >
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                          </select>
+                        ) : (
+                          <span className="text-slate-400 font-mono text-[11px]">View Only</span>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -252,7 +252,26 @@ CREATE TABLE IF NOT EXISTS data_quality_metrics (
     last_sync TEXT NOT NULL
 );
 
--- 12. CREATE OPTIMIZED INDEXES
+-- 12. ROLE-BASED NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS notifications (
+    id TEXT PRIMARY KEY,
+    recipient_user_id TEXT REFERENCES users(id) ON DELETE CASCADE,
+    recipient_role TEXT NOT NULL,
+    factory_id TEXT NOT NULL REFERENCES factories(id) ON DELETE CASCADE DEFAULT 'FAC-001',
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    notification_type TEXT NOT NULL,
+    priority TEXT NOT NULL CHECK (priority IN ('CRITICAL', 'HIGH', 'MEDIUM', 'LOW')),
+    related_module TEXT NOT NULL,
+    related_record_id TEXT,
+    target_path TEXT NOT NULL DEFAULT '/dashboard',
+    is_read BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    read_at TIMESTAMPTZ,
+    meta TEXT
+);
+
+-- 13. CREATE OPTIMIZED INDEXES
 CREATE INDEX IF NOT EXISTS idx_machines_factory ON machines(factory_id);
 CREATE INDEX IF NOT EXISTS idx_machines_status ON machines(status);
 CREATE INDEX IF NOT EXISTS idx_production_factory ON production_records(factory_id);
@@ -262,6 +281,11 @@ CREATE INDEX IF NOT EXISTS idx_incidents_factory ON incidents(factory_id);
 CREATE INDEX IF NOT EXISTS idx_work_orders_factory ON work_orders(factory_id);
 CREATE INDEX IF NOT EXISTS idx_sops_factory ON sops(factory_id);
 CREATE INDEX IF NOT EXISTS idx_dq_factory ON data_quality_metrics(factory_id);
+CREATE INDEX IF NOT EXISTS idx_notif_recipient_user ON notifications(recipient_user_id);
+CREATE INDEX IF NOT EXISTS idx_notif_recipient_role ON notifications(recipient_role);
+CREATE INDEX IF NOT EXISTS idx_notif_factory ON notifications(factory_id);
+CREATE INDEX IF NOT EXISTS idx_notif_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notif_created_at ON notifications(created_at DESC);
 
 -- 13. CONFIGURE ROW LEVEL SECURITY (RLS) FOR API / ANON ACCESS
 ALTER TABLE factories ENABLE ROW LEVEL SECURITY;

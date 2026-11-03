@@ -7,7 +7,14 @@ import { Wrench, Plus, Trash2, Calendar } from 'lucide-react';
 import { formatDuration, formatCurrency } from '../utils/formatters.ts';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
+import { useAuth } from '../contexts/AuthContext.tsx';
+
 export const MaintenancePage: React.FC = () => {
+  const { user } = useAuth();
+  const isAdmin = user?.role ? ['ADMIN', 'FACTORY_OWNER', 'SUPER_ADMIN'].includes(user.role) : false;
+  const canCreateWorkOrder = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR'].includes(user.role) : false;
+  const canLogMaintenance = user?.role ? ['ADMIN', 'SUPER_ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR'].includes(user.role) : false;
+
   const {
     maintenance,
     machines,
@@ -50,20 +57,24 @@ export const MaintenancePage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            onClick={() => setIsLogModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Calendar className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Log Maintenance</span>
-          </button>
-          <button
-            onClick={() => setIsWorkOrderModalOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>New Work Order</span>
-          </button>
+          {canLogMaintenance && (
+            <button
+              onClick={() => setIsLogModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Calendar className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Log Maintenance</span>
+            </button>
+          )}
+          {canCreateWorkOrder && (
+            <button
+              onClick={() => setIsWorkOrderModalOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>New Work Order</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -126,14 +137,16 @@ export const MaintenancePage: React.FC = () => {
                     <td className="py-3 px-4 font-medium text-amber-700">{formatDuration(m.downtime_hours, 'h')}</td>
                     <td className="py-3 px-4 text-emerald-700 font-semibold">{formatCurrency(m.cost_usd)}</td>
                     <td className="py-3 px-4 text-right">
-                      <button
-                        onClick={() => handleDelete(m.id)}
-                        disabled={deletingId === m.id}
-                        title="Delete maintenance record"
-                        className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDelete(m.id)}
+                          disabled={deletingId === m.id}
+                          title="Delete maintenance record"
+                          className="p-1 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );

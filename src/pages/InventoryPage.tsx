@@ -422,30 +422,38 @@ export const InventoryPage: React.FC = () => {
                           {part.supplier}
                         </td>
                         <td className="py-2.5 px-4 text-center space-x-1.5">
-                          <button
-                            onClick={() => {
-                              setEditingPart(part);
-                              setRestockAmount(10);
-                            }}
-                            className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10.5px] font-bold transition-colors cursor-pointer"
-                            title="Quick Restock"
-                          >
-                            Restock
-                          </button>
-                          <button
-                            onClick={() => openEditModal(part)}
-                            className="p-1 text-slate-400 hover:text-[#0E79B2] hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                            title="Edit Part"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(part.id)}
-                            className="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
-                            title="Delete Part"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'MANAGER_SUPERVISOR' || user?.role === 'TECHNICIAN') ? (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingPart(part);
+                                  setRestockAmount(10);
+                                }}
+                                className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded text-[10.5px] font-bold transition-colors cursor-pointer"
+                                title="Quick Restock"
+                              >
+                                Restock
+                              </button>
+                              <button
+                                onClick={() => openEditModal(part)}
+                                className="p-1 text-slate-400 hover:text-[#0E79B2] hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                title="Edit Part"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'MANAGER_SUPERVISOR') && (
+                                <button
+                                  onClick={() => handleDelete(part.id)}
+                                  className="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                  title="Delete Part"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-slate-400 font-mono text-[11px]">View Only</span>
+                          )}
                         </td>
                       </tr>
                     );

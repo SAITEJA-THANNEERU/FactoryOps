@@ -22,7 +22,10 @@ import type {
   TechnicianProfile,
   RepairProgressUpdate,
   IncidentResolutionSubmission,
-  IncidentVerificationDetails
+  IncidentVerificationDetails,
+  AppNotification,
+  NotificationPriority,
+  NotificationType
 } from './src/types/index.ts';
 import { GoogleGenAI } from '@google/genai';
 
@@ -64,12 +67,18 @@ interface AuthenticatedRequest extends Request {
 // Authentication middleware
 function authenticate(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  let token: string | undefined;
+
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query.token && typeof req.query.token === 'string') {
+    token = req.query.token;
+  }
+
+  if (!token) {
     res.status(401).json({ error: 'Unauthorized: Missing or invalid authorization token' });
     return;
   }
-
-  const token = authHeader.split(' ')[1];
   const session = db.sessions.get(token);
 
   if (!session || session.expiresAt < Date.now()) {
@@ -95,14 +104,25 @@ function authenticate(req: AuthenticatedRequest, res: Response, next: NextFuncti
   next();
 }
 
-// Role authorization middleware
+// Role authorization middleware with centralized audit logging of denied attempts
 function authorizeRole(...allowedRoles: UserRole[]) {
   return (req: AuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+      res.status(401).json({ error: 'Unauthorized: Authentication token is required' });
       return;
     }
     if (!allowedRoles.includes(req.user.role)) {
+      const details = `Access denied to ${req.method} ${req.path}. Required: [${allowedRoles.join(', ')}], actual: '${req.user.role}'`;
+      logAuditEvent(req, 'UNAUTHORIZED_ACCESS_ATTEMPT', 'ApiRoute', req.path, details).catch(() => {});
+      dispatchNotification({
+        recipient_role: 'SUPER_ADMIN',
+        title: `Security Event: Unauthorized Access Attempt`,
+        message: `User ${req.user.name} (${req.user.role}) attempted unauthorized action on ${req.method} ${req.path}`,
+        notification_type: 'SECURITY_EVENT',
+        priority: 'CRITICAL',
+        related_module: 'Security & Access Control',
+        target_path: '/system-health'
+      }).catch(() => {});
       res.status(403).json({
         error: `Forbidden: Role '${req.user.role}' is not authorized to access this resource`
       });
@@ -119,22 +139,23 @@ function getResolvedFactoryId(req: AuthenticatedRequest, requestedFactoryId?: st
   return 'FAC-001';
 }
 
-// Audit Event Logger Helper
+// Centralized Audit Event Logger Helper
 async function logAuditEvent(
-  req: AuthenticatedRequest,
+  req: AuthenticatedRequest | Request,
   action: string,
   entityType: string,
   entityId: string,
-  details: string
+  details: string,
+  overrideUser?: { id: string; name: string; role: string; email: string; factory_id?: string | null }
 ) {
-  if (!req.user) return;
+  const u = overrideUser || (req as AuthenticatedRequest).user;
   try {
     await supabaseAdapter.createSystemAuditLog({
-      factory_id: req.user.factory_id || 'FAC-001',
-      user_id: req.user.id,
-      user_name: req.user.name,
-      user_role: req.user.role,
-      user_email: req.user.email,
+      factory_id: u?.factory_id || 'FAC-001',
+      user_id: u?.id || 'ANONYMOUS',
+      user_name: u?.name || 'Anonymous User',
+      user_role: u?.role || 'NONE',
+      user_email: u?.email || 'unauthenticated@factoryops.com',
       action,
       entity_type: entityType,
       entity_id: entityId,
@@ -172,12 +193,14 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req: Request, res: Response):
   });
 
   if (!user) {
+    logAuditEvent(req, 'LOGIN_FAILED', 'User', identifier, `Failed login attempt: Account identifier '${identifier}' not found`).catch(() => {});
     res.status(401).json({ success: false, error: 'Invalid email/username or password' });
     return;
   }
 
   const isValid = verifyPassword(password, user.password_hash, user.salt);
   if (!isValid) {
+    logAuditEvent(req, 'LOGIN_FAILED', 'User', user.id, `Failed login attempt: Invalid password for user ${user.name} (${user.email})`, user).catch(() => {});
     res.status(401).json({ success: false, error: 'Invalid email/username or password' });
     return;
   }
@@ -194,6 +217,9 @@ app.post(['/api/auth/login', '/api/auth/login/'], (req: Request, res: Response):
   });
 
   const factory = user.factory_id ? db.factories.find(f => f.id === user.factory_id) : null;
+
+  // Log successful login
+  logAuditEvent(req, 'LOGIN_SUCCESS', 'User', user.id, `User ${user.name} (${user.role}) authenticated successfully`, user).catch(() => {});
 
   // Return user without hash or salt
   const safeUser: User = {
@@ -303,6 +329,9 @@ app.post(['/api/auth/register', '/api/auth/register/'], (req: Request, res: Resp
 
   db.users.push(newUser);
 
+  // Log user registration event
+  logAuditEvent(req, 'USER_REGISTERED', 'User', newUser.id, `User ${newUser.name} (${newUser.role}) registered an account`, newUser).catch(() => {});
+
   // 6. Return Safe Confirmation (Never expose salt or password hash)
   const safeUser: User = {
     id: newUser.id,
@@ -323,12 +352,19 @@ app.post(['/api/auth/register', '/api/auth/register/'], (req: Request, res: Resp
   });
 });
 
-// Logout endpoint
+// Logout endpoint with session cleanup and audit trail
 app.post(['/api/auth/logout', '/api/auth/logout/'], (req: AuthenticatedRequest, res: Response): void => {
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
     const token = authHeader.split(' ')[1];
-    db.sessions.delete(token);
+    const session = db.sessions.get(token);
+    if (session) {
+      const user = db.users.find(u => u.id === session.userId);
+      if (user) {
+        logAuditEvent(req, 'LOGOUT', 'User', user.id, `User ${user.name} logged out`, user).catch(() => {});
+      }
+      db.sessions.delete(token);
+    }
   }
   res.json({ success: true, message: 'Successfully logged out' });
 });
@@ -986,6 +1022,7 @@ app.post('/api/machines', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'M
     }
     const factoryId = req.user?.factory_id || machineData.factory_id || 'FAC-001';
     const { machine, syncedToSupabase, supabaseError } = await supabaseAdapter.createMachine(machineData, factoryId);
+    await logAuditEvent(req, 'CREATE_MACHINE', 'Machine', machine.id, `Created machine ${machine.name} (${machine.machine_id}) on line ${machine.line}`);
     res.status(201).json({
       ...machine,
       syncedToSupabase,
@@ -1005,6 +1042,7 @@ app.put('/api/machines/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN',
       res.status(404).json({ error: `Machine ${req.params.id} not found` });
       return;
     }
+    await logAuditEvent(req, 'UPDATE_MACHINE', 'Machine', req.params.id, `Updated specifications for machine ${machine.name}`);
     res.json({
       ...machine,
       syncedToSupabase,
@@ -1029,6 +1067,70 @@ app.patch('/api/machines/:id/status', authenticate, authorizeRole('ADMIN', 'SUPE
       res.status(404).json({ error: `Machine ${req.params.id} not found` });
       return;
     }
+    await logAuditEvent(req, 'UPDATE_MACHINE_STATUS', 'Machine', req.params.id, `Changed machine ${machine.name} status to ${status}`);
+
+    if (status === 'offline') {
+      dispatchNotification({
+        recipient_role: 'SUPER_ADMIN',
+        title: `Major Machine Failure: ${machine.name}`,
+        message: `${machine.machine_id} on line ${machine.line} changed to OFFLINE status.`,
+        notification_type: 'MACHINE_DOWNTIME',
+        priority: 'CRITICAL',
+        related_module: 'Machines',
+        related_record_id: machine.id,
+        target_path: '/machines',
+        meta: `Status: Offline`
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'ADMIN',
+        factory_id: 'FAC-001',
+        title: `Critical Machine Failure: ${machine.name} Offline`,
+        message: `${machine.name} (${machine.machine_id}) is down. Requires immediate maintenance intervention.`,
+        notification_type: 'MACHINE_DOWNTIME',
+        priority: 'CRITICAL',
+        related_module: 'Machines',
+        related_record_id: machine.id,
+        target_path: '/machines'
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: 'FAC-001',
+        title: `Machine Downtime Alert: ${machine.name}`,
+        message: `${machine.name} on line ${machine.line} marked OFFLINE. Review shift allocation.`,
+        notification_type: 'MACHINE_DOWNTIME',
+        priority: 'HIGH',
+        related_module: 'Machines',
+        related_record_id: machine.id,
+        target_path: '/manager-dashboard'
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        title: `Production Capacity Alert: ${machine.name} Offline`,
+        message: `Machine downtime on line ${machine.line} will impact throughput targets. Adjust line scheduling.`,
+        notification_type: 'PRODUCTION_SHORTFALL',
+        priority: 'HIGH',
+        related_module: 'Production',
+        related_record_id: machine.id,
+        target_path: '/production-planner-dashboard'
+      }).catch(() => {});
+    } else if (status === 'warning') {
+      dispatchNotification({
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: 'FAC-001',
+        title: `Machine Warning: ${machine.name}`,
+        message: `${machine.name} running in degraded/warning status. Preventative inspection advised.`,
+        notification_type: 'MACHINE_STATUS_CHANGE',
+        priority: 'MEDIUM',
+        related_module: 'Machines',
+        related_record_id: machine.id,
+        target_path: '/machines'
+      }).catch(() => {});
+    }
+
     res.json({
       ...machine,
       syncedToSupabase,
@@ -1044,6 +1146,7 @@ app.patch('/api/machines/:id/status', authenticate, authorizeRole('ADMIN', 'SUPE
 app.delete('/api/machines/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteMachine(req.params.id);
+    await logAuditEvent(req, 'DELETE_MACHINE', 'Machine', req.params.id, `Decommissioned machine ${req.params.id}`);
     res.json({ success, machine_id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     console.error(`[API DELETE /api/machines/${req.params.id}] Error:`, err.message);
@@ -1113,6 +1216,7 @@ app.post('/api/production', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 
   try {
     const factoryId = req.user?.factory_id || req.body.factory_id || 'FAC-001';
     const { record, syncedToSupabase, supabaseError } = await supabaseAdapter.createProduction(req.body, factoryId);
+    await logAuditEvent(req, 'LOG_PRODUCTION', 'ProductionRecord', record.id, `Logged shift ${record.shift} production for machine ${record.machine_id}: ${record.actual_units} units`);
     res.status(201).json({
       ...record,
       syncedToSupabase,
@@ -1128,6 +1232,7 @@ app.post('/api/production', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 
 app.delete('/api/production/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteProduction(req.params.id);
+    await logAuditEvent(req, 'DELETE_PRODUCTION', 'ProductionRecord', req.params.id, `Deleted production record ${req.params.id}`);
     res.json({ success, id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1156,6 +1261,7 @@ app.post('/api/maintenance', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN',
   try {
     const factoryId = req.user?.factory_id || req.body.factory_id || 'FAC-001';
     const { record, syncedToSupabase, supabaseError } = await supabaseAdapter.createMaintenance(req.body, factoryId);
+    await logAuditEvent(req, 'LOG_MAINTENANCE', 'MaintenanceRecord', record.id, `Logged ${record.type} maintenance on ${record.machine_id} by ${record.technician}`);
     res.status(201).json({
       ...record,
       syncedToSupabase,
@@ -1171,6 +1277,7 @@ app.post('/api/maintenance', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN',
 app.delete('/api/maintenance/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteMaintenance(req.params.id);
+    await logAuditEvent(req, 'DELETE_MAINTENANCE', 'MaintenanceRecord', req.params.id, `Deleted maintenance record ${req.params.id}`);
     res.json({ success, id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1194,7 +1301,7 @@ app.get('/api/incidents', authenticate, async (req: AuthenticatedRequest, res: R
   }
 });
 
-app.post('/api/incidents', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.post('/api/incidents', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR', 'TECHNICIAN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { machine_id, title, description, severity, factory_id } = req.body;
   try {
     const fId = req.user?.factory_id || factory_id || 'FAC-001';
@@ -1215,6 +1322,87 @@ app.post('/api/incidents', authenticate, async (req: AuthenticatedRequest, res: 
     };
 
     const { incident, syncedToSupabase, supabaseError } = await supabaseAdapter.createIncident(incidentPayload, fId);
+    await logAuditEvent(req, 'REPORT_INCIDENT', 'Incident', incident.incident_id || incident.id || 'INC', `Reported incident ${incident.incident_id || incident.id}: ${incident.title} on machine ${incident.machine_id}`);
+
+    // Role-based notification triggers
+    if (incidentPayload.severity === 'Critical') {
+      dispatchNotification({
+        recipient_role: 'SUPER_ADMIN',
+        title: `Critical Factory Incident: ${incidentPayload.incident_id}`,
+        message: `${incidentPayload.title} on machine ${incidentPayload.machine_id}. Immediate operations attention required.`,
+        notification_type: 'INCIDENT_CRITICAL',
+        priority: 'CRITICAL',
+        related_module: 'Incidents',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/incidents',
+        meta: `Machine: ${incidentPayload.machine_id} • Severity: Critical`
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'ADMIN',
+        factory_id: fId,
+        title: `Critical Machine Failure: ${incidentPayload.machine_id}`,
+        message: `${incidentPayload.title} reported by ${incidentPayload.reported_by}.`,
+        notification_type: 'INCIDENT_CRITICAL',
+        priority: 'CRITICAL',
+        related_module: 'Incidents',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/incidents',
+        meta: `Machine: ${incidentPayload.machine_id}`
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: fId,
+        title: `Incident Requiring Attention: ${incidentPayload.incident_id}`,
+        message: `${incidentPayload.title} on ${incidentPayload.machine_id}. Assign technician immediately.`,
+        notification_type: 'INCIDENT_CRITICAL',
+        priority: 'CRITICAL',
+        related_module: 'Incidents',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/manager-dashboard',
+        meta: `Action: Assign Technician`
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: fId,
+        title: `Machine Breakdown Affecting Production`,
+        message: `Failure on ${incidentPayload.machine_id}: ${incidentPayload.title}. Monitor production shortfalls.`,
+        notification_type: 'MACHINE_DOWNTIME',
+        priority: 'HIGH',
+        related_module: 'Production',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/production-planner-dashboard',
+        meta: `Line impact alert`
+      }).catch(() => {});
+    } else {
+      const priorityLevel: NotificationPriority = incidentPayload.severity === 'High' ? 'HIGH' : 'MEDIUM';
+      dispatchNotification({
+        recipient_role: 'ADMIN',
+        factory_id: fId,
+        title: `New Factory Incident: ${incidentPayload.incident_id}`,
+        message: `${incidentPayload.title} on machine ${incidentPayload.machine_id} (${incidentPayload.severity})`,
+        notification_type: 'INCIDENT_NEW',
+        priority: priorityLevel,
+        related_module: 'Incidents',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/incidents'
+      }).catch(() => {});
+
+      dispatchNotification({
+        recipient_role: 'MANAGER_SUPERVISOR',
+        factory_id: fId,
+        title: `New Incident Requiring Attention: ${incidentPayload.incident_id}`,
+        message: `${incidentPayload.title} on ${incidentPayload.machine_id}. Review and assign technician.`,
+        notification_type: 'INCIDENT_NEW',
+        priority: priorityLevel,
+        related_module: 'Incidents',
+        related_record_id: incident.incident_id || incident.id,
+        target_path: '/manager-dashboard'
+      }).catch(() => {});
+    }
+
     res.status(201).json({
       ...incident,
       syncedToSupabase,
@@ -1226,7 +1414,7 @@ app.post('/api/incidents', authenticate, async (req: AuthenticatedRequest, res: 
 });
 
 // Update Incident (Admin, Super Admin, Manager, Technician)
-app.patch('/api/incidents/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+app.patch('/api/incidents/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR', 'TECHNICIAN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { status, severity, title, downtime_minutes } = req.body;
     const { incident, syncedToSupabase, supabaseError } = await supabaseAdapter.updateIncident(req.params.id, {
@@ -1239,6 +1427,7 @@ app.patch('/api/incidents/:id', authenticate, async (req: AuthenticatedRequest, 
       res.status(404).json({ error: `Incident ${req.params.id} not found` });
       return;
     }
+    await logAuditEvent(req, 'UPDATE_INCIDENT', 'Incident', req.params.id, `Updated incident ${req.params.id} status to ${status || 'updated'}`);
     res.json({
       ...incident,
       syncedToSupabase,
@@ -1253,17 +1442,32 @@ app.patch('/api/incidents/:id', authenticate, async (req: AuthenticatedRequest, 
 app.delete('/api/incidents/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteIncident(req.params.id);
+    await logAuditEvent(req, 'DELETE_INCIDENT', 'Incident', req.params.id, `Deleted incident ${req.params.id}`);
     res.json({ success, id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Work Orders
+// Work Orders (Technician restricted to assigned / unassigned tasks)
 app.get('/api/work-orders', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const lineId = req.query.line_id as string;
   try {
-    const workOrders = await supabaseAdapter.getWorkOrders(lineId);
+    let workOrders = await supabaseAdapter.getWorkOrders(lineId);
+
+    // If Technician, restrict to assigned work orders or unassigned ones
+    if (req.user?.role === 'TECHNICIAN') {
+      const uName = req.user.name.toLowerCase();
+      const uFirst = uName.split(' ')[0];
+      workOrders = workOrders.filter(w =>
+        !w.assigned_to ||
+        w.assigned_to === 'Unassigned' ||
+        w.assigned_to === 'Assigned Technician' ||
+        w.assigned_to.toLowerCase().includes(uFirst) ||
+        w.assigned_to.toLowerCase().includes(req.user!.id.toLowerCase())
+      );
+    }
+
     res.json(workOrders);
   } catch (err: any) {
     console.error('[API /api/work-orders] Error:', err.message);
@@ -1276,7 +1480,8 @@ app.get('/api/work-orders', authenticate, async (req: AuthenticatedRequest, res:
   }
 });
 
-app.post('/api/work-orders', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Create Work Order (Admin, Super Admin, Manager / Supervisor only)
+app.post('/api/work-orders', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const { machine_id, title, priority, assigned_to, due_date, estimated_hours, parts_required, factory_id } = req.body;
   try {
     const fId = req.user?.factory_id || factory_id || 'FAC-001';
@@ -1296,6 +1501,59 @@ app.post('/api/work-orders', authenticate, async (req: AuthenticatedRequest, res
     };
 
     const { workOrder, syncedToSupabase, supabaseError } = await supabaseAdapter.createWorkOrder(newWorkOrder, fId);
+    await logAuditEvent(req, 'CREATE_WORK_ORDER', 'WorkOrder', workOrder.work_order_id || workOrder.id || 'WO', `Created work order ${workOrder.work_order_id || workOrder.id}: ${workOrder.title} assigned to ${workOrder.assigned_to}`);
+
+    const woPriority: NotificationPriority = workOrder.priority === 'Critical' ? 'CRITICAL' : workOrder.priority === 'High' ? 'HIGH' : 'MEDIUM';
+
+    dispatchNotification({
+      recipient_role: 'ADMIN',
+      factory_id: fId,
+      title: `New Work Order: ${workOrder.work_order_id}`,
+      message: `${workOrder.title} (${workOrder.priority} Priority) assigned to ${workOrder.assigned_to}`,
+      notification_type: 'WORK_ORDER_NEW',
+      priority: woPriority,
+      related_module: 'Work Orders',
+      related_record_id: workOrder.work_order_id || workOrder.id,
+      target_path: '/work-orders',
+      meta: `Machine: ${workOrder.machine_id} • Assigned: ${workOrder.assigned_to}`
+    }).catch(() => {});
+
+    dispatchNotification({
+      recipient_role: 'MANAGER_SUPERVISOR',
+      factory_id: fId,
+      title: `New Work Order Created: ${workOrder.work_order_id}`,
+      message: `${workOrder.title} for ${workOrder.machine_id}. Due: ${workOrder.due_date}`,
+      notification_type: 'WORK_ORDER_NEW',
+      priority: woPriority,
+      related_module: 'Work Orders',
+      related_record_id: workOrder.work_order_id || workOrder.id,
+      target_path: '/manager-dashboard'
+    }).catch(() => {});
+
+    // If assigned to a technician, notify them
+    if (workOrder.assigned_to) {
+      const assignedTechUser = db.users.find(u =>
+        u.role === 'TECHNICIAN' &&
+        (u.name.toLowerCase().includes(workOrder.assigned_to.toLowerCase().split(' ')[0]) ||
+         workOrder.assigned_to.toLowerCase().includes(u.name.toLowerCase().split(' ')[0]))
+      );
+      if (assignedTechUser) {
+        dispatchNotification({
+          recipient_user_id: assignedTechUser.id,
+          recipient_role: 'TECHNICIAN',
+          factory_id: fId,
+          title: `New Work Assignment: ${workOrder.work_order_id}`,
+          message: `${workOrder.title} on ${workOrder.machine_id}. Due by ${workOrder.due_date}.`,
+          notification_type: 'WORK_ORDER_NEW',
+          priority: woPriority,
+          related_module: 'Work Orders',
+          related_record_id: workOrder.work_order_id || workOrder.id,
+          target_path: '/technician-dashboard',
+          meta: `Due: ${workOrder.due_date}`
+        }).catch(() => {});
+      }
+    }
+
     res.status(201).json({
       ...workOrder,
       syncedToSupabase,
@@ -1306,14 +1564,37 @@ app.post('/api/work-orders', authenticate, async (req: AuthenticatedRequest, res
   }
 });
 
-app.patch('/api/work-orders/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Update Work Order (Admin, Super Admin, Manager, Technician for assigned tasks)
+app.patch('/api/work-orders/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR', 'TECHNICIAN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { status, assigned_to, actual_hours, priority } = req.body;
+
+    // Technician validation: can only update their own assigned work orders and cannot mark Completed directly
+    if (req.user?.role === 'TECHNICIAN') {
+      const currentWO = db.workOrders.find(w => w.id === req.params.id || w.work_order_id === req.params.id);
+      if (currentWO) {
+        const uFirst = req.user.name.toLowerCase().split(' ')[0];
+        const isAssigned =
+          !currentWO.assigned_to ||
+          currentWO.assigned_to === 'Unassigned' ||
+          currentWO.assigned_to.toLowerCase().includes(uFirst) ||
+          currentWO.assigned_to.toLowerCase().includes(req.user.id.toLowerCase());
+        if (!isAssigned) {
+          res.status(403).json({ error: 'Forbidden: You can only update your own assigned work orders' });
+          return;
+        }
+        if (status === 'Completed') {
+          res.status(403).json({ error: 'Segregation of Duties: Technicians cannot directly close work orders. Submit for Manager verification.' });
+          return;
+        }
+      }
+    }
+
     const updates: Partial<WorkOrder> = {};
     if (status) updates.status = status;
-    if (assigned_to) updates.assigned_to = assigned_to;
+    if (assigned_to && req.user?.role !== 'TECHNICIAN') updates.assigned_to = assigned_to;
     if (actual_hours !== undefined) updates.actual_hours = Number(actual_hours);
-    if (priority) updates.priority = priority;
+    if (priority && req.user?.role !== 'TECHNICIAN') updates.priority = priority;
     if (status === 'Completed') {
       updates.completed_at = new Date().toISOString();
     }
@@ -1323,6 +1604,7 @@ app.patch('/api/work-orders/:id', authenticate, async (req: AuthenticatedRequest
       res.status(404).json({ error: `Work order ${req.params.id} not found` });
       return;
     }
+    await logAuditEvent(req, 'UPDATE_WORK_ORDER', 'WorkOrder', req.params.id, `Updated work order ${req.params.id}: status=${status || 'updated'}`);
     res.json({
       ...workOrder,
       syncedToSupabase,
@@ -1337,6 +1619,7 @@ app.patch('/api/work-orders/:id', authenticate, async (req: AuthenticatedRequest
 app.delete('/api/work-orders/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteWorkOrder(req.params.id);
+    await logAuditEvent(req, 'DELETE_WORK_ORDER', 'WorkOrder', req.params.id, `Deleted work order ${req.params.id}`);
     res.json({ success, id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1357,8 +1640,8 @@ app.get('/api/sops', authenticate, async (req: AuthenticatedRequest, res: Respon
   res.json(sops);
 });
 
-// Data Quality
-app.get('/api/data-quality', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Data Quality (Admin and Super Admin only)
+app.get(['/api/data-quality', '/api/data-quality/'], authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const resolvedFactoryId = getResolvedFactoryId(req);
 
   if (resolvedFactoryId === '__FORBIDDEN__') {
@@ -1371,8 +1654,8 @@ app.get('/api/data-quality', authenticate, async (req: AuthenticatedRequest, res
   res.json(dq);
 });
 
-// Users Management
-app.get('/api/users', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+// Users Management (Admin, Super Admin, Manager / Supervisor)
+app.get('/api/users', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   const factoryId = req.user!.role === 'SUPER_ADMIN' ? null : req.user!.factory_id;
   const users = await supabaseAdapter.getUsers(factoryId);
   res.json(users);
@@ -1393,6 +1676,7 @@ app.post('/api/users', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), asyn
       role,
       factory_id: fId
     });
+    await logAuditEvent(req, 'CREATE_USER', 'User', user?.id || name, `Created employee/user ${name} (${role}) in factory ${fId}`);
     res.status(201).json({
       ...user,
       syncedToSupabase,
@@ -1407,6 +1691,7 @@ app.post('/api/users', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), asyn
 app.delete('/api/users/:id', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
     const { success, syncedToSupabase, supabaseError } = await supabaseAdapter.deleteUser(req.params.id);
+    await logAuditEvent(req, 'DELETE_USER', 'User', req.params.id, `Deleted/deactivated user ${req.params.id}`);
     res.json({ success, id: req.params.id, syncedToSupabase, supabaseError });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -1423,204 +1708,264 @@ app.post('/api/supabase/sync', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN
   }
 });
 
-// Notifications Management
+// ==========================================
+// ROLE-BASED NOTIFICATION & REAL-TIME SSE ENGINE
+// ==========================================
+
+interface NotificationClient {
+  id: string;
+  res: Response;
+  userId: string;
+  role: UserRole;
+  factoryId?: string;
+}
+
+const notificationClients = new Map<string, NotificationClient>();
+
+export async function dispatchNotification(data: {
+  recipient_user_id?: string | null;
+  recipient_role?: UserRole | string;
+  factory_id?: string;
+  title: string;
+  message: string;
+  notification_type: NotificationType;
+  priority: NotificationPriority;
+  related_module: string;
+  related_record_id?: string;
+  target_path: string;
+  meta?: string;
+}): Promise<AppNotification> {
+  const notif = db.createNotification({
+    recipient_user_id: data.recipient_user_id || null,
+    recipient_role: (data.recipient_role as any) || 'ALL',
+    factory_id: data.factory_id || 'FAC-001',
+    title: data.title,
+    message: data.message,
+    notification_type: data.notification_type,
+    priority: data.priority,
+    related_module: data.related_module,
+    related_record_id: data.related_record_id,
+    target_path: data.target_path,
+    meta: data.meta
+  });
+  // Asynchronously synchronize to Supabase
+  supabaseAdapter.createNotification(notif).catch(e => console.warn('[Supabase notif sync]', e.message));
+
+  // Push to connected SSE clients honoring strict role, user, and factory isolation
+  const payload = `data: ${JSON.stringify({ type: 'NOTIFICATION', notification: notif })}\n\n`;
+
+  notificationClients.forEach((client) => {
+    // 1. Strict recipient user isolation
+    if (notif.recipient_user_id) {
+      if (client.userId !== notif.recipient_user_id && client.role !== 'SUPER_ADMIN') {
+        return;
+      }
+    }
+
+    // 2. Role isolation
+    if (notif.recipient_role) {
+      if (client.role !== notif.recipient_role && client.role !== 'SUPER_ADMIN') {
+        return;
+      }
+    }
+
+    // 3. Factory isolation
+    if (notif.factory_id && client.role !== 'SUPER_ADMIN') {
+      const clientFactory = client.factoryId || 'FAC-001';
+      if (clientFactory !== notif.factory_id) {
+        return;
+      }
+    }
+
+    try {
+      client.res.write(payload);
+    } catch {
+      // Disconnected client will be pruned
+    }
+  });
+
+  return notif;
+}
+
+function broadcastNotificationRead(notificationIds: string[], userId?: string) {
+  const payload = `data: ${JSON.stringify({ type: 'NOTIFICATION_READ', ids: notificationIds, userId })}\n\n`;
+  notificationClients.forEach((client) => {
+    try {
+      client.res.write(payload);
+    } catch {
+      // ignore
+    }
+  });
+}
+
+// 1. Real-Time SSE Stream for live notification delivery
+app.get('/api/notifications/stream', authenticate, (req: AuthenticatedRequest, res: Response): void => {
+  const user = req.user!;
+  const factoryId = getResolvedFactoryId(req) || 'FAC-001';
+  const clientId = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+  res.flushHeaders?.();
+
+  const client: NotificationClient = {
+    id: clientId,
+    res,
+    userId: user.id,
+    role: user.role,
+    factoryId
+  };
+  notificationClients.set(clientId, client);
+
+  // Initial handshake
+  res.write(`data: ${JSON.stringify({ type: 'CONNECTED', clientId, userId: user.id, role: user.role })}\n\n`);
+
+  // Periodic heartbeat
+  const pingInterval = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch {
+      clearInterval(pingInterval);
+      notificationClients.delete(clientId);
+    }
+  }, 25000);
+
+  req.on('close', () => {
+    clearInterval(pingInterval);
+    notificationClients.delete(clientId);
+  });
+});
+
+// 2. Fetch Notifications with strict role-based access control
 app.get('/api/notifications', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const factoryId = getResolvedFactoryId(req);
-    const targetFactoryId = factoryId === '__FORBIDDEN__' || !factoryId ? undefined : factoryId;
-    const [incidents, workOrders, machines] = await Promise.all([
-      supabaseAdapter.getIncidents(targetFactoryId),
-      supabaseAdapter.getWorkOrders(targetFactoryId),
-      supabaseAdapter.getMachines(targetFactoryId)
-    ]);
+    const user = req.user!;
+    const factoryId = getResolvedFactoryId(req) || 'FAC-001';
+    const filter = (req.query.filter as string) || 'all';
 
-    const notifications: any[] = [];
+    const notifications = await supabaseAdapter.getNotifications(user.id, user.role, factoryId, filter);
+    const unreadCount = notifications.filter(n => !n.is_read).length;
 
-    // 1. Incidents
-    incidents.forEach(inc => {
-      if (inc.status !== 'Closed') {
-        const id = `inc-${inc.id || inc.incident_id}`;
-        notifications.push({
-          id,
-          type: 'incident',
-          title: `${inc.severity} Incident: ${inc.incident_id}`,
-          description: `${inc.title} - ${inc.description || 'Equipment anomaly'}`,
-          timestamp: inc.reported_at ? new Date(inc.reported_at).toLocaleString() : 'Recent shift',
-          severity: inc.severity || 'High',
-          targetPath: '/incidents',
-          read: db.readNotificationIds.has(id),
-          meta: `Machine: ${inc.machine_id} • Status: ${inc.status}`
-        });
-      }
-    });
-
-    // 2. Work Orders
-    workOrders.forEach(wo => {
-      if (wo.status === 'Pending Parts' || wo.status === 'In Progress' || wo.priority === 'Critical' || wo.priority === 'High') {
-        const id = `wo-${wo.id || wo.work_order_id}`;
-        notifications.push({
-          id,
-          type: 'work_order',
-          title: `Work Order: ${wo.work_order_id}`,
-          description: `${wo.title} (${wo.priority} Priority)`,
-          timestamp: wo.created_at ? new Date(wo.created_at).toLocaleString() : 'Active order',
-          severity: wo.priority || 'Medium',
-          targetPath: '/work-orders',
-          read: db.readNotificationIds.has(id),
-          meta: `Assigned: ${wo.assigned_to || 'Unassigned'} • Due: ${wo.due_date || 'ASAP'}`
-        });
-      }
-    });
-
-    // 3. Warning Machines
-    machines.forEach(m => {
-      if (m.status === 'warning') {
-        const id = `mach-${m.id || m.machine_id}`;
-        notifications.push({
-          id,
-          type: 'machine',
-          title: `Telemetry Alert: ${m.machine_id}`,
-          description: `${m.name} operating at elevated telemetry (${m.temperature_c}°C / ${m.vibration_mms} mm/s)`,
-          timestamp: 'Live reading',
-          severity: 'High',
-          targetPath: '/machines',
-          read: db.readNotificationIds.has(id),
-          meta: `Line: ${m.line} • Health: ${m.health_score}%`
-        });
-      }
-    });
-
-    // 4. Technician Incident Assignments
-    const currentUser = req.user;
-    const assignments = db.getTechnicianAssignments({ factory_id: targetFactoryId || 'FAC-001' });
-
-    assignments.forEach(asn => {
-      const isAssignedToCurrentTech = currentUser?.role === 'TECHNICIAN' && (asn.technician_id === currentUser?.id || asn.technician_email === currentUser?.email);
-      const isManagerOrAdmin = currentUser?.role === 'MANAGER_SUPERVISOR' || currentUser?.role === 'ADMIN' || currentUser?.role === 'SUPER_ADMIN';
-
-      if (isAssignedToCurrentTech) {
-        if (asn.status === 'PENDING ACCEPTANCE') {
-          const id = `asn-action-${asn.id}`;
-          notifications.push({
-            id,
-            type: 'incident',
-            title: `Action Required: New Incident Assigned (${asn.priority})`,
-            description: `${asn.incident_title} on ${asn.machine_name} - Please accept or reject`,
-            timestamp: new Date(asn.assigned_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            severity: asn.priority === 'Critical' ? 'Critical' : 'High',
-            targetPath: '/technician-dashboard',
-            read: db.readNotificationIds.has(id),
-            meta: `Assigned by: ${asn.assigned_by_name} • Due: ${new Date(asn.due_date).toLocaleDateString()}`
-          });
-        }
-        if (asn.is_overdue) {
-          const id = `asn-overdue-${asn.id}`;
-          notifications.push({
-            id,
-            type: 'incident',
-            title: `Overdue Repair: ${asn.incident_title}`,
-            description: `Repair on ${asn.machine_name} exceeded due date (${new Date(asn.due_date).toLocaleDateString()})`,
-            timestamp: 'Overdue',
-            severity: 'Critical',
-            targetPath: '/technician-dashboard',
-            read: db.readNotificationIds.has(id),
-            meta: `Status: ${asn.status} • Progress: ${asn.repair_progress_percent}%`
-          });
-        }
-      }
-
-      if (isManagerOrAdmin) {
-        if (asn.status === 'RESOLVED_PENDING_VERIFICATION') {
-          const id = `asn-verify-${asn.id}`;
-          notifications.push({
-            id,
-            type: 'incident',
-            title: `Verification Required: Repair Completed`,
-            description: `${asn.technician_name} resolved incident on ${asn.machine_name}. Ready for inspection & sign-off.`,
-            timestamp: asn.resolved_at ? new Date(asn.resolved_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Pending review',
-            severity: 'High',
-            targetPath: '/manager-dashboard',
-            read: db.readNotificationIds.has(id),
-            meta: `Technician: ${asn.technician_name} • Actual hours: ${asn.resolution_submission?.actual_repair_hours || 0}h`
-          });
-        } else if (asn.status === 'REJECTED') {
-          const id = `asn-rej-${asn.id}`;
-          notifications.push({
-            id,
-            type: 'incident',
-            title: `Assignment Rejected by Technician`,
-            description: `${asn.technician_name} rejected incident "${asn.incident_title}". Reason: ${asn.rejection_reason || 'Unavailable'}`,
-            timestamp: new Date(asn.updated_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            severity: 'High',
-            targetPath: '/manager-dashboard',
-            read: db.readNotificationIds.has(id),
-            meta: `Needs Reassignment`
-          });
-        } else if (asn.status === 'REASSIGNMENT_REQUESTED') {
-          const id = `asn-reasgn-${asn.id}`;
-          notifications.push({
-            id,
-            type: 'incident',
-            title: `Reassignment Requested`,
-            description: `${asn.technician_name} requested reassignment for "${asn.incident_title}": ${asn.reassignment_reason}`,
-            timestamp: new Date(asn.updated_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            severity: 'Medium',
-            targetPath: '/manager-dashboard',
-            read: db.readNotificationIds.has(id),
-            meta: `Review request in Manager Dashboard`
-          });
-        }
-      }
-    });
-
-    const unreadCount = notifications.filter(n => !n.read).length;
     res.json({
       notifications,
       unreadCount,
-      readIds: Array.from(db.readNotificationIds)
+      readIds: notifications.filter(n => n.is_read).map(n => n.id)
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/notifications/mark-read', authenticate, (req: AuthenticatedRequest, res: Response): void => {
-  const { id, ids } = req.body || {};
-  if (id && typeof id === 'string') {
-    db.readNotificationIds.add(id);
-  }
-  if (Array.isArray(ids)) {
-    ids.forEach(item => {
-      if (typeof item === 'string') db.readNotificationIds.add(item);
+// 3. Mark specific notification(s) as read with authorization verification
+app.post('/api/notifications/mark-read', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const { id, ids } = req.body || {};
+    const targetIds: string[] = [];
+
+    if (id && typeof id === 'string') targetIds.push(id);
+    if (Array.isArray(ids)) {
+      ids.forEach(item => {
+        if (typeof item === 'string') targetIds.push(item);
+      });
+    }
+
+    if (targetIds.length === 0) {
+      res.status(400).json({ error: 'Notification id or ids array is required' });
+      return;
+    }
+
+    const markedReadIds: string[] = [];
+    for (const targetId of targetIds) {
+      const updated = await supabaseAdapter.markNotificationAsRead(targetId, user.id, user.role);
+      if (updated) {
+        markedReadIds.push(targetId);
+      }
+    }
+
+    if (markedReadIds.length > 0) {
+      broadcastNotificationRead(markedReadIds, user.id);
+    }
+
+    res.json({
+      success: true,
+      markedReadIds,
+      count: markedReadIds.length
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  res.json({
-    success: true,
-    readIds: Array.from(db.readNotificationIds)
-  });
 });
 
+// 4. Mark all authorized notifications as read
 app.post('/api/notifications/mark-all-read', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
   try {
-    const { ids } = req.body || {};
-    if (Array.isArray(ids) && ids.length > 0) {
-      ids.forEach(id => db.readNotificationIds.add(id));
-    } else {
-      // Fetch all current notifications and mark them read
-      const [incidents, workOrders, machines] = await Promise.all([
-        supabaseAdapter.getIncidents(),
-        supabaseAdapter.getWorkOrders(),
-        supabaseAdapter.getMachines()
-      ]);
-      incidents.forEach(i => db.readNotificationIds.add(`inc-${i.id || i.incident_id}`));
-      workOrders.forEach(w => db.readNotificationIds.add(`wo-${w.id || w.work_order_id}`));
-      machines.forEach(m => db.readNotificationIds.add(`mach-${m.id || m.machine_id}`));
+    const user = req.user!;
+    const factoryId = getResolvedFactoryId(req) || 'FAC-001';
+    const markedIds = await supabaseAdapter.markAllNotificationsAsRead(user.id, user.role, factoryId);
+
+    if (markedIds.length > 0) {
+      broadcastNotificationRead(markedIds, user.id);
     }
+
     res.json({
       success: true,
       unreadCount: 0,
-      readIds: Array.from(db.readNotificationIds)
+      markedReadIds: markedIds
     });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Delete / Clear notification
+app.delete('/api/notifications/:id', authenticate, async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const user = req.user!;
+    const deleted = await supabaseAdapter.clearNotification(req.params.id, user.id, user.role);
+    if (!deleted) {
+      res.status(404).json({ error: 'Notification not found or unauthorized to delete' });
+      return;
+    }
+
+    // Broadcast clear event to SSE
+    const payload = `data: ${JSON.stringify({ type: 'NOTIFICATION_DELETED', id: req.params.id })}\n\n`;
+    notificationClients.forEach(c => {
+      try { c.res.write(payload); } catch {}
+    });
+
+    res.json({ success: true, id: req.params.id });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 6. Manual dispatch notification endpoint (Supervisor / Admin / Super Admin)
+app.post('/api/notifications', authenticate, authorizeRole('ADMIN', 'SUPER_ADMIN', 'MANAGER_SUPERVISOR'), async (req: AuthenticatedRequest, res: Response): Promise<void> => {
+  try {
+    const { recipient_user_id, recipient_role, title, message, notification_type, priority, related_module, related_record_id, target_path, meta } = req.body;
+    if (!title || !message) {
+      res.status(400).json({ error: 'title and message are required' });
+      return;
+    }
+
+    const notif = await dispatchNotification({
+      recipient_user_id,
+      recipient_role,
+      factory_id: req.user?.factory_id || 'FAC-001',
+      title,
+      message,
+      notification_type: notification_type || 'SYSTEM_HEALTH',
+      priority: priority || 'MEDIUM',
+      related_module: related_module || 'General',
+      related_record_id,
+      target_path: target_path || '/overview',
+      meta
+    });
+
+    res.status(201).json(notif);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
@@ -2140,6 +2485,23 @@ app.post('/api/technician-assignments', authenticate, authorizeRole('ADMIN', 'SU
       `Assigned incident ${incident_id} to ${assignment.technician_name} (${assignment.technician_specialisation})`
     );
 
+    // Notify assigned technician (strict isolation!)
+    if (assignment.technician_id) {
+      dispatchNotification({
+        recipient_user_id: assignment.technician_id,
+        recipient_role: 'TECHNICIAN',
+        factory_id: 'FAC-001',
+        title: `Action Required: New Incident Assigned (${assignment.priority})`,
+        message: `${assignment.incident_title} on ${assignment.machine_name} - Please accept or reject`,
+        notification_type: 'ASSIGNMENT_NEW',
+        priority: assignment.priority === 'Critical' ? 'CRITICAL' : 'HIGH',
+        related_module: 'Technician Incident Assignment',
+        related_record_id: assignment.id,
+        target_path: '/technician-dashboard',
+        meta: `Assigned by: ${user.name} • Due: ${new Date(assignment.due_date).toLocaleDateString()}`
+      }).catch(() => {});
+    }
+
     res.status(201).json(assignment);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to create technician assignment' });
@@ -2153,6 +2515,11 @@ app.post('/api/technician-assignments/:id/accept', authenticate, authorizeRole('
     const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    if (assignment.status !== 'PENDING ACCEPTANCE' && assignment.status !== 'PENDING' && assignment.status !== 'REASSIGNMENT_APPROVED') {
+      res.status(400).json({ error: `Cannot accept assignment: Current status is '${assignment.status}', must be 'PENDING ACCEPTANCE'` });
       return;
     }
 
@@ -2189,6 +2556,19 @@ app.post('/api/technician-assignments/:id/accept', authenticate, authorizeRole('
     });
 
     await logAuditEvent(req, 'ACCEPT_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} accepted assignment ${req.params.id}`);
+
+    // Notify Manager/Supervisor of acceptance
+    dispatchNotification({
+      recipient_role: 'MANAGER_SUPERVISOR',
+      factory_id: 'FAC-001',
+      title: `Assignment Accepted: ${assignment.machine_name}`,
+      message: `${user.name} accepted repair for ${assignment.incident_title}.`,
+      notification_type: 'ASSIGNMENT_ACCEPTED',
+      priority: 'MEDIUM',
+      related_module: 'Technician Incident Assignment',
+      related_record_id: req.params.id,
+      target_path: '/manager-dashboard'
+    }).catch(() => {});
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to accept assignment' });
@@ -2208,6 +2588,11 @@ app.post('/api/technician-assignments/:id/reject', authenticate, authorizeRole('
     const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    if (assignment.status !== 'PENDING ACCEPTANCE' && assignment.status !== 'PENDING' && assignment.status !== 'REASSIGNMENT_APPROVED') {
+      res.status(400).json({ error: `Cannot reject assignment: Current status is '${assignment.status}', must be 'PENDING ACCEPTANCE'` });
       return;
     }
 
@@ -2246,6 +2631,21 @@ app.post('/api/technician-assignments/:id/reject', authenticate, authorizeRole('
     });
 
     await logAuditEvent(req, 'REJECT_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} rejected assignment ${req.params.id}. Reason: ${rejection_reason}`);
+
+    // Notify Manager/Supervisor of technician rejection
+    dispatchNotification({
+      recipient_role: 'MANAGER_SUPERVISOR',
+      factory_id: 'FAC-001',
+      title: `Assignment Rejected by Technician`,
+      message: `${user.name} rejected incident "${assignment.incident_title}" on ${assignment.machine_name}. Reason: ${rejection_reason}`,
+      notification_type: 'ASSIGNMENT_REJECTED',
+      priority: 'HIGH',
+      related_module: 'Technician Incident Assignment',
+      related_record_id: req.params.id,
+      target_path: '/manager-dashboard',
+      meta: 'Needs Reassignment'
+    }).catch(() => {});
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to reject assignment' });
@@ -2301,6 +2701,20 @@ app.post('/api/technician-assignments/:id/request-reassignment', authenticate, a
     });
 
     await logAuditEvent(req, 'REQUEST_REASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} requested reassignment: ${reassignment_reason}`);
+
+    // Notify Manager/Supervisor of reassignment request
+    dispatchNotification({
+      recipient_role: 'MANAGER_SUPERVISOR',
+      factory_id: 'FAC-001',
+      title: `Reassignment Requested: ${assignment.incident_title}`,
+      message: `${user.name} requested reassignment for ${assignment.machine_name}: ${reassignment_reason}`,
+      notification_type: 'REASSIGNMENT_REQUESTED',
+      priority: 'HIGH',
+      related_module: 'Technician Incident Assignment',
+      related_record_id: req.params.id,
+      target_path: '/manager-dashboard'
+    }).catch(() => {});
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to request reassignment' });
@@ -2378,6 +2792,11 @@ app.post('/api/technician-assignments/:id/start-repair', authenticate, authorize
     const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    if (assignment.status !== 'ACCEPTED' && assignment.status !== 'IN PROGRESS') {
+      res.status(400).json({ error: `Cannot start repair: Current status is '${assignment.status}', must be 'ACCEPTED'` });
       return;
     }
 
@@ -2511,6 +2930,11 @@ app.post('/api/technician-assignments/:id/resolve', authenticate, authorizeRole(
       return;
     }
 
+    if (assignment.status !== 'IN PROGRESS' && assignment.status !== 'ACCEPTED') {
+      res.status(400).json({ error: `Cannot submit resolution: Current status is '${assignment.status}', must be 'IN PROGRESS'` });
+      return;
+    }
+
     const isAuthorized =
       user.role === 'ADMIN' ||
       user.role === 'SUPER_ADMIN' ||
@@ -2555,6 +2979,34 @@ app.post('/api/technician-assignments/:id/resolve', authenticate, authorizeRole(
     });
 
     await logAuditEvent(req, 'RESOLVE_ASSIGNMENT', 'IncidentAssignment', req.params.id, `Technician ${user.name} submitted repair resolution for ${assignment.machine_name} (${actual_repair_hours} hrs)`);
+
+    // Notify Manager/Supervisor of pending verification
+    dispatchNotification({
+      recipient_role: 'MANAGER_SUPERVISOR',
+      factory_id: 'FAC-001',
+      title: `Verification Required: Repair Completed`,
+      message: `${user.name} resolved incident on ${assignment.machine_name}. Ready for inspection & sign-off.`,
+      notification_type: 'REPAIR_VERIFICATION_PENDING',
+      priority: 'HIGH',
+      related_module: 'Technician Incident Assignment',
+      related_record_id: req.params.id,
+      target_path: '/manager-dashboard',
+      meta: `Technician: ${user.name} • Actual hours: ${actual_repair_hours}h`
+    }).catch(() => {});
+
+    // Notify Admin of maintenance update
+    dispatchNotification({
+      recipient_role: 'ADMIN',
+      factory_id: 'FAC-001',
+      title: `Maintenance Update: Repair Completed on ${assignment.machine_name}`,
+      message: `${user.name} finished repair. Pending supervisor verification.`,
+      notification_type: 'WORK_ORDER_UPDATE',
+      priority: 'MEDIUM',
+      related_module: 'Technician Incident Assignment',
+      related_record_id: req.params.id,
+      target_path: '/incidents'
+    }).catch(() => {});
+
     res.json(updated);
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Failed to submit resolution' });
@@ -2569,6 +3021,24 @@ app.post('/api/technician-assignments/:id/verify', authenticate, authorizeRole('
     const assignment = await supabaseAdapter.getTechnicianAssignment(req.params.id);
     if (!assignment) {
       res.status(404).json({ error: 'Assignment not found' });
+      return;
+    }
+
+    if (assignment.status !== 'RESOLVED_PENDING_VERIFICATION') {
+      res.status(400).json({ error: `Cannot verify assignment: Current status is '${assignment.status}', must be 'RESOLVED_PENDING_VERIFICATION'` });
+      return;
+    }
+
+    const isSelfRepair =
+      assignment.technician_id === user.id ||
+      assignment.technician_email?.toLowerCase() === user.email?.toLowerCase() ||
+      (assignment.technician_name && user.name && (
+        assignment.technician_name.toLowerCase().includes(user.name.toLowerCase().split(' ')[0]) ||
+        user.name.toLowerCase().includes(assignment.technician_name.toLowerCase().split(' ')[0])
+      ));
+
+    if (isSelfRepair && user.role !== 'SUPER_ADMIN') {
+      res.status(403).json({ error: 'Segregation of Duties: Technicians cannot verify and sign off on their own repair resolution' });
       return;
     }
 
@@ -2611,6 +3081,36 @@ app.post('/api/technician-assignments/:id/verify', authenticate, authorizeRole('
       });
 
       await logAuditEvent(req, 'VERIFY_RESOLUTION', 'IncidentAssignment', req.params.id, `Manager ${user.name} approved resolution for assignment ${req.params.id}`);
+
+      // Notify assigned technician of verification approval
+      if (assignment.technician_id) {
+        dispatchNotification({
+          recipient_user_id: assignment.technician_id,
+          recipient_role: 'TECHNICIAN',
+          factory_id: 'FAC-001',
+          title: `Repair Verified & Approved! (★ ${quality_rating || 5}/5)`,
+          message: `Manager ${user.name} verified and approved your repair on ${assignment.machine_name}.`,
+          notification_type: 'REPAIR_VERIFIED',
+          priority: 'MEDIUM',
+          related_module: 'Technician Incident Assignment',
+          related_record_id: req.params.id,
+          target_path: '/technician-dashboard'
+        }).catch(() => {});
+      }
+
+      // Notify Production Planner that machine is restored to availability
+      dispatchNotification({
+        recipient_role: 'PRODUCTION_PLANNER',
+        factory_id: 'FAC-001',
+        title: `Machine Restored to Availability: ${assignment.machine_name}`,
+        message: `Repair on ${assignment.machine_name} verified and operational.`,
+        notification_type: 'MACHINE_STATUS_CHANGE',
+        priority: 'MEDIUM',
+        related_module: 'Production',
+        related_record_id: assignment.machine_id,
+        target_path: '/production-planner-dashboard'
+      }).catch(() => {});
+
       res.json(updated);
     } else {
       // Rejection: return to IN PROGRESS for rework
@@ -2630,6 +3130,23 @@ app.post('/api/technician-assignments/:id/verify', authenticate, authorizeRole('
       });
 
       await logAuditEvent(req, 'REJECT_RESOLUTION', 'IncidentAssignment', req.params.id, `Manager ${user.name} rejected resolution for ${req.params.id}, requesting rework`);
+
+      // Notify assigned technician that rework is required
+      if (assignment.technician_id) {
+        dispatchNotification({
+          recipient_user_id: assignment.technician_id,
+          recipient_role: 'TECHNICIAN',
+          factory_id: 'FAC-001',
+          title: `Repair Rejected - Rework Required`,
+          message: `Manager ${user.name} returned repair on ${assignment.machine_name} for rework. Reason: ${rework_instructions || verification_notes || 'Review root cause and re-test.'}`,
+          notification_type: 'REPAIR_REWORK_REQUIRED',
+          priority: 'HIGH',
+          related_module: 'Technician Incident Assignment',
+          related_record_id: req.params.id,
+          target_path: '/technician-dashboard'
+        }).catch(() => {});
+      }
+
       res.json(updated);
     }
   } catch (err: any) {

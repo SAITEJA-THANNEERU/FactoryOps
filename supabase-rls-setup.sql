@@ -1,12 +1,14 @@
 -- ======================================================================
--- FACTORYOPS AI: SECURE SUPABASE DATABASE & ROW LEVEL SECURITY MIGRATION
+-- FACTORYOPS ENTERPRISE: STRICT MULTI-ROLE ROW LEVEL SECURITY (RLS) POLICIES
+-- Platform: FactoryOps Smart Factory Operations & Maintenance
 -- ======================================================================
--- Security Model:
--- 1. Keeps Row Level Security (RLS) ENABLED on all 11 tables.
--- 2. DENIES all anonymous ('anon') access to sensitive tables (users, system_audit_logs, work_orders, etc.).
--- 3. Restricts SELECT access to 'authenticated' sessions for operational queries.
--- 4. Restricts INSERT/UPDATE/DELETE actions to 'authenticated' users and server-side service_role.
--- 5. Creates missing 'spare_parts' and 'system_audit_logs' tables idempotently.
+-- Security Model & Roles:
+-- 1. SUPER_ADMIN: Platform-wide governance across all facilities.
+-- 2. ADMIN / FACTORY_OWNER: Factory-level administration within assigned factory.
+-- 3. MANAGER_SUPERVISOR / FACTORY_MANAGER / SUPERVISOR: Production floor coordination,
+--    technician dispatch, and maintenance sign-off.
+-- 4. PRODUCTION_PLANNER / ANALYST: Output scheduling and machine capacity analysis.
+-- 5. TECHNICIAN / OPERATOR: Assigned machine maintenance, repair diagnostics, and personal attendance.
 -- ======================================================================
 
 -- 1. ENABLE ROW LEVEL SECURITY ON ALL TABLES
@@ -21,8 +23,9 @@ ALTER TABLE IF EXISTS sops ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS data_quality_metrics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS spare_parts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE IF EXISTS system_audit_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS attendance_records ENABLE ROW LEVEL SECURITY;
 
--- 2. DROP ALL OBSOLETE, PERMISSIVE, OR ANONYMOUS POLICIES IF THEY EXIST
+-- 2. DROP OBSOLETE & PERMISSIVE POLICIES
 DROP POLICY IF EXISTS "Public full access to factories" ON factories;
 DROP POLICY IF EXISTS "Public full access to users" ON users;
 DROP POLICY IF EXISTS "Public full access to machines" ON machines;
@@ -33,17 +36,17 @@ DROP POLICY IF EXISTS "Public full access to work_orders" ON work_orders;
 DROP POLICY IF EXISTS "Public full access to sops" ON sops;
 DROP POLICY IF EXISTS "Public full access to data_quality" ON data_quality_metrics;
 
-DROP POLICY IF EXISTS "Allow read access to factories" ON factories;
-DROP POLICY IF EXISTS "Allow read access to users" ON users;
-DROP POLICY IF EXISTS "Allow read access to machines" ON machines;
-DROP POLICY IF EXISTS "Allow read access to production_records" ON production_records;
-DROP POLICY IF EXISTS "Allow read access to maintenance_records" ON maintenance_records;
-DROP POLICY IF EXISTS "Allow read access to incidents" ON incidents;
-DROP POLICY IF EXISTS "Allow read access to work_orders" ON work_orders;
-DROP POLICY IF EXISTS "Allow read access to sops" ON sops;
-DROP POLICY IF EXISTS "Allow read access to data_quality" ON data_quality_metrics;
-DROP POLICY IF EXISTS "Allow read access to spare_parts" ON spare_parts;
-DROP POLICY IF EXISTS "Allow read access to system_audit_logs" ON system_audit_logs;
+DROP POLICY IF EXISTS "Allow authenticated read to factories" ON factories;
+DROP POLICY IF EXISTS "Allow authenticated read to users" ON users;
+DROP POLICY IF EXISTS "Allow authenticated read to machines" ON machines;
+DROP POLICY IF EXISTS "Allow authenticated read to production_records" ON production_records;
+DROP POLICY IF EXISTS "Allow authenticated read to maintenance_records" ON maintenance_records;
+DROP POLICY IF EXISTS "Allow authenticated read to incidents" ON incidents;
+DROP POLICY IF EXISTS "Allow authenticated read to work_orders" ON work_orders;
+DROP POLICY IF EXISTS "Allow authenticated read to sops" ON sops;
+DROP POLICY IF EXISTS "Allow authenticated read to data_quality" ON data_quality_metrics;
+DROP POLICY IF EXISTS "Allow authenticated read to spare_parts" ON spare_parts;
+DROP POLICY IF EXISTS "Allow authenticated read to system_audit_logs" ON system_audit_logs;
 
 DROP POLICY IF EXISTS "Allow authenticated write to factories" ON factories;
 DROP POLICY IF EXISTS "Allow authenticated write to users" ON users;
@@ -57,137 +60,333 @@ DROP POLICY IF EXISTS "Allow authenticated write to data_quality" ON data_qualit
 DROP POLICY IF EXISTS "Allow authenticated write to spare_parts" ON spare_parts;
 DROP POLICY IF EXISTS "Allow authenticated write to system_audit_logs" ON system_audit_logs;
 
--- 3. SECURE READ POLICIES (AUTHENTICATED SESSIONS ONLY - NO ANON ACCESS TO SENSITIVE DATA)
-CREATE POLICY "Allow authenticated read to factories" ON factories
-  FOR SELECT TO authenticated USING (true);
+-- Drop prior specific policies if re-running migration
+DROP POLICY IF EXISTS "factories_select_policy" ON factories;
+DROP POLICY IF EXISTS "factories_admin_policy" ON factories;
+DROP POLICY IF EXISTS "users_select_policy" ON users;
+DROP POLICY IF EXISTS "users_admin_write_policy" ON users;
+DROP POLICY IF EXISTS "machines_select_policy" ON machines;
+DROP POLICY IF EXISTS "machines_manage_policy" ON machines;
+DROP POLICY IF EXISTS "machines_delete_policy" ON machines;
+DROP POLICY IF EXISTS "production_select_policy" ON production_records;
+DROP POLICY IF EXISTS "production_write_policy" ON production_records;
+DROP POLICY IF EXISTS "production_delete_policy" ON production_records;
+DROP POLICY IF EXISTS "maintenance_select_policy" ON maintenance_records;
+DROP POLICY IF EXISTS "maintenance_write_policy" ON maintenance_records;
+DROP POLICY IF EXISTS "maintenance_delete_policy" ON maintenance_records;
+DROP POLICY IF EXISTS "incidents_select_policy" ON incidents;
+DROP POLICY IF EXISTS "incidents_insert_policy" ON incidents;
+DROP POLICY IF EXISTS "incidents_update_policy" ON incidents;
+DROP POLICY IF EXISTS "incidents_delete_policy" ON incidents;
+DROP POLICY IF EXISTS "work_orders_select_policy" ON work_orders;
+DROP POLICY IF EXISTS "work_orders_insert_policy" ON work_orders;
+DROP POLICY IF EXISTS "work_orders_update_policy" ON work_orders;
+DROP POLICY IF EXISTS "work_orders_delete_policy" ON work_orders;
+DROP POLICY IF EXISTS "spare_parts_select_policy" ON spare_parts;
+DROP POLICY IF EXISTS "spare_parts_write_policy" ON spare_parts;
+DROP POLICY IF EXISTS "spare_parts_delete_policy" ON spare_parts;
+DROP POLICY IF EXISTS "attendance_select_policy" ON attendance_records;
+DROP POLICY IF EXISTS "attendance_insert_policy" ON attendance_records;
+DROP POLICY IF EXISTS "attendance_update_policy" ON attendance_records;
+DROP POLICY IF EXISTS "audit_logs_select_policy" ON system_audit_logs;
+DROP POLICY IF EXISTS "audit_logs_insert_policy" ON system_audit_logs;
 
-CREATE POLICY "Allow authenticated read to users" ON users
-  FOR SELECT TO authenticated USING (true);
+-- 3. HELPER FUNCTIONS FOR USER IDENTITY, ROLE, AND FACTORY MAPPING
+CREATE OR REPLACE FUNCTION get_current_user_role()
+RETURNS text AS $$
+  SELECT coalesce(
+    current_setting('request.jwt.claims', true)::jsonb ->> 'user_role',
+    (SELECT role FROM public.users WHERE id = auth.uid()::text LIMIT 1),
+    'TECHNICIAN'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
-CREATE POLICY "Allow authenticated read to machines" ON machines
-  FOR SELECT TO authenticated USING (true);
+CREATE OR REPLACE FUNCTION get_current_user_factory_id()
+RETURNS text AS $$
+  SELECT coalesce(
+    current_setting('request.jwt.claims', true)::jsonb ->> 'factory_id',
+    (SELECT factory_id FROM public.users WHERE id = auth.uid()::text LIMIT 1),
+    'FAC-001'
+  );
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
 
-CREATE POLICY "Allow authenticated read to production_records" ON production_records
-  FOR SELECT TO authenticated USING (true);
+-- 4. FACTORIES POLICIES
+-- Super Admin sees all; other roles only see their own assigned factory
+CREATE POLICY "factories_select_policy" ON factories
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    id = get_current_user_factory_id()
+  );
 
-CREATE POLICY "Allow authenticated read to maintenance_records" ON maintenance_records
-  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "factories_admin_policy" ON factories
+  FOR ALL TO authenticated
+  USING (get_current_user_role() = 'SUPER_ADMIN')
+  WITH CHECK (get_current_user_role() = 'SUPER_ADMIN');
 
-CREATE POLICY "Allow authenticated read to incidents" ON incidents
-  FOR SELECT TO authenticated USING (true);
+-- 5. USERS TABLE POLICIES
+-- Super Admin sees all; Admins & Managers see factory roster; Technicians & Planners only see own profile
+CREATE POLICY "users_select_policy" ON users
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    (get_current_user_role() IN ('ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR') AND factory_id = get_current_user_factory_id()) OR
+    id = auth.uid()::text
+  );
 
-CREATE POLICY "Allow authenticated read to work_orders" ON work_orders
-  FOR SELECT TO authenticated USING (true);
+-- Only Super Admin and Factory Admin can create or update users
+CREATE POLICY "users_admin_write_policy" ON users
+  FOR ALL TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    (get_current_user_role() IN ('ADMIN', 'FACTORY_OWNER') AND factory_id = get_current_user_factory_id())
+  )
+  WITH CHECK (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    (get_current_user_role() IN ('ADMIN', 'FACTORY_OWNER') AND factory_id = get_current_user_factory_id())
+  );
 
-CREATE POLICY "Allow authenticated read to sops" ON sops
-  FOR SELECT TO authenticated USING (true);
+-- 6. MACHINES TABLE POLICIES
+-- Read: Anyone in assigned factory or Super Admin
+CREATE POLICY "machines_select_policy" ON machines
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    factory_id = get_current_user_factory_id()
+  );
 
-CREATE POLICY "Allow authenticated read to data_quality" ON data_quality_metrics
-  FOR SELECT TO authenticated USING (true);
+-- Insert/Update: Admin, Manager, and Technician status updates
+CREATE POLICY "machines_manage_policy" ON machines
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR')
+  );
 
--- 4. SECURE WRITE POLICIES (AUTHENTICATED & SERVER SERVICE_ROLE)
-CREATE POLICY "Allow authenticated write to factories" ON factories
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "machines_update_policy" ON machines
+  FOR UPDATE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  );
 
-CREATE POLICY "Allow authenticated write to users" ON users
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- Delete: Strictly Admin and Super Admin
+CREATE POLICY "machines_delete_policy" ON machines
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
 
-CREATE POLICY "Allow authenticated write to machines" ON machines
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- 7. PRODUCTION RECORDS POLICIES
+-- Technicians have no access to production schedules; Planners, Managers, Admins have access
+CREATE POLICY "production_select_policy" ON production_records
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'PRODUCTION_PLANNER', 'ANALYST')
+  );
 
-CREATE POLICY "Allow authenticated write to production_records" ON production_records
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "production_write_policy" ON production_records
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'PRODUCTION_PLANNER', 'ANALYST')
+  );
 
-CREATE POLICY "Allow authenticated write to maintenance_records" ON maintenance_records
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "production_delete_policy" ON production_records
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
 
-CREATE POLICY "Allow authenticated write to incidents" ON incidents
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- 8. MAINTENANCE RECORDS POLICIES
+-- Technicians only see their own tasks or factory maintenance; Planners restricted
+CREATE POLICY "maintenance_select_policy" ON maintenance_records
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR') OR
+    (get_current_user_role() IN ('TECHNICIAN', 'OPERATOR') AND (technician_id = auth.uid()::text OR factory_id = get_current_user_factory_id()))
+  );
 
-CREATE POLICY "Allow authenticated write to work_orders" ON work_orders
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "maintenance_write_policy" ON maintenance_records
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  );
 
-CREATE POLICY "Allow authenticated write to sops" ON sops
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "maintenance_delete_policy" ON maintenance_records
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
 
-CREATE POLICY "Allow authenticated write to data_quality" ON data_quality_metrics
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- 9. INCIDENTS POLICIES
+CREATE POLICY "incidents_select_policy" ON incidents
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    factory_id = get_current_user_factory_id()
+  );
 
--- 5. CREATE MISSING TABLES IDEMPOTENTLY (spare_parts & system_audit_logs)
-CREATE TABLE IF NOT EXISTS spare_parts (
-  id TEXT PRIMARY KEY,
-  part_number TEXT NOT NULL,
-  name TEXT NOT NULL,
-  category TEXT NOT NULL,
-  factory_id TEXT NOT NULL DEFAULT 'FAC-001',
-  stock_quantity INTEGER NOT NULL DEFAULT 0,
-  min_reorder_level INTEGER NOT NULL DEFAULT 5,
-  unit_cost_usd NUMERIC(10,2) NOT NULL DEFAULT 0.00,
-  supplier TEXT,
-  location_bin TEXT,
-  last_restocked_at TIMESTAMPTZ,
-  machine_compatibility JSONB DEFAULT '[]'::jsonb,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+CREATE POLICY "incidents_insert_policy" ON incidents
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  );
 
-CREATE TABLE IF NOT EXISTS system_audit_logs (
-  id TEXT PRIMARY KEY,
-  factory_id TEXT NOT NULL DEFAULT 'FAC-001',
-  user_id TEXT NOT NULL,
-  user_name TEXT NOT NULL,
-  user_role TEXT NOT NULL,
-  user_email TEXT NOT NULL,
-  action TEXT NOT NULL,
-  entity_type TEXT NOT NULL,
-  entity_id TEXT,
-  details TEXT,
-  timestamp TIMESTAMPTZ DEFAULT NOW()
-);
+CREATE POLICY "incidents_update_policy" ON incidents
+  FOR UPDATE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  );
 
--- RLS & Policies for new tables
-CREATE POLICY "Allow authenticated read to spare_parts" ON spare_parts
-  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "incidents_delete_policy" ON incidents
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
 
-CREATE POLICY "Allow authenticated write to spare_parts" ON spare_parts
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+-- 10. WORK ORDERS POLICIES
+-- Technicians only see work orders assigned to them or unassigned in their factory; Planners view only
+CREATE POLICY "work_orders_select_policy" ON work_orders
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'PRODUCTION_PLANNER', 'ANALYST') OR
+    (get_current_user_role() IN ('TECHNICIAN', 'OPERATOR') AND (
+      technician_id = auth.uid()::text OR
+      assigned_to ILIKE '%' || (SELECT name FROM public.users WHERE id = auth.uid()::text LIMIT 1) || '%' OR
+      status = 'Pending'
+    ))
+  );
 
-CREATE POLICY "Allow authenticated read to system_audit_logs" ON system_audit_logs
-  FOR SELECT TO authenticated USING (true);
+-- Creation restricted to Managers, Admins, Super Admin (Technicians and Planners cannot create work orders)
+CREATE POLICY "work_orders_insert_policy" ON work_orders
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR')
+  );
 
-CREATE POLICY "Allow authenticated write to system_audit_logs" ON system_audit_logs
-  FOR ALL TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "work_orders_update_policy" ON work_orders
+  FOR UPDATE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR') OR
+    (get_current_user_role() IN ('TECHNICIAN', 'OPERATOR') AND (
+      technician_id = auth.uid()::text OR
+      assigned_to ILIKE '%' || (SELECT name FROM public.users WHERE id = auth.uid()::text LIMIT 1) || '%'
+    ))
+  );
 
--- 6. INITIAL FACTORY & PERSONNEL SEED (SAFE - PRESERVES EXISTING RECORDS)
-INSERT INTO factories (id, factory_code, name, location, industry, owner_name, status, capacity, established_year, created_at, last_activity)
-VALUES
-  ('FAC-001', 'APX-01', 'Apex Precision Manufacturing', 'Hyderabad, Telangana', 'Automotive Components', 'Rajesh Kumar', 'Operational', '45,000 units/mo', 2014, '2023-01-15T08:00:00Z', '10 mins ago'),
-  ('FAC-002', 'NOV-02', 'Nova Industrial Systems', 'Pune, Maharashtra', 'Engineering Components', 'Vikram Malhotra', 'Operational', '38,000 units/mo', 2017, '2023-03-20T09:30:00Z', '25 mins ago'),
-  ('FAC-003', 'VTX-03', 'Vertex Auto Components', 'Chennai, Tamil Nadu', 'Automotive', 'Suresh Raman', 'Operational', '52,000 units/mo', 2011, '2023-05-10T10:15:00Z', '5 mins ago'),
-  ('FAC-004', 'PRM-04', 'PrimeTech Manufacturing', 'Bengaluru, Karnataka', 'Electronics', 'Ananya Sharma', 'Production Slowdown', '80,000 units/mo', 2019, '2023-08-01T11:00:00Z', '1 hour ago'),
-  ('FAC-005', 'ORN-05', 'Orion Industrial Works', 'Coimbatore, Tamil Nadu', 'Heavy Engineering', 'K. Swaminathan', 'Maintenance Alert', '25,000 units/mo', 2008, '2023-11-12T14:45:00Z', '40 mins ago')
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  status = EXCLUDED.status,
-  last_activity = EXCLUDED.last_activity;
+CREATE POLICY "work_orders_delete_policy" ON work_orders
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR')
+  );
 
-INSERT INTO users (id, name, email, password_hash, salt, role, factory_id, factory_name, status, created_at)
-VALUES
-  ('USR-001', 'Super Admin Officer', 'superadmin@factoryops.com', '1235f7e0c413849b4d9ad55a1850b2713326287b5c3e3b1d93da0dbba763554f99049c068244ba1da0b3651c5758257730cce0f167999dc8bd3ddb78f65c3cfa', 'eaa3d95487230eb7189dc3dbc8f022db', 'SUPER_ADMIN', NULL, NULL, 'active', '2026-10-28T10:52:48.015Z'),
-  ('USR-002', 'Rajesh Kumar (Plant Admin)', 'admin.apex@factoryops.com', 'a27f915e7e4d0915ba4a7deb4d490083f0bbd27e0e58486eaec34d533f11ee4a9419143f1ec361bf30afae1c253d7bf7512c961b498cb1466eb1ea46b401517d', '72e0f10b7e152a0f91ee53c927656b43', 'ADMIN', 'FAC-001', 'Apex Precision Manufacturing', 'active', '2026-10-28T10:52:48.016Z'),
-  ('USR-007', 'Amit Deshmukh (Manager/Supervisor)', 'manager.apex@factoryops.com', 'Manager@123', 'default_salt', 'MANAGER_SUPERVISOR', 'FAC-001', 'Apex Precision Manufacturing', 'active', '2026-10-28T10:52:48.020Z')
-ON CONFLICT (id) DO UPDATE SET
-  name = EXCLUDED.name,
-  role = EXCLUDED.role,
-  factory_id = EXCLUDED.factory_id;
+-- 11. SPARE PARTS POLICIES
+CREATE POLICY "spare_parts_select_policy" ON spare_parts
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR
+    factory_id = get_current_user_factory_id()
+  );
 
--- 7. PERFORMANCE INDEXES
-CREATE INDEX IF NOT EXISTS idx_spare_parts_factory_id ON spare_parts(factory_id);
-CREATE INDEX IF NOT EXISTS idx_spare_parts_part_number ON spare_parts(part_number);
-CREATE INDEX IF NOT EXISTS idx_system_audit_logs_factory_id ON system_audit_logs(factory_id);
-CREATE INDEX IF NOT EXISTS idx_system_audit_logs_timestamp ON system_audit_logs(timestamp DESC);
-CREATE INDEX IF NOT EXISTS idx_machines_factory_id ON machines(factory_id);
-CREATE INDEX IF NOT EXISTS idx_production_records_factory_id ON production_records(factory_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_records_factory_id ON maintenance_records(factory_id);
-CREATE INDEX IF NOT EXISTS idx_incidents_factory_id ON incidents(factory_id);
-CREATE INDEX IF NOT EXISTS idx_work_orders_factory_id ON work_orders(factory_id);
+CREATE POLICY "spare_parts_write_policy" ON spare_parts
+  FOR ALL TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  )
+  WITH CHECK (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'TECHNICIAN', 'OPERATOR')
+  );
+
+CREATE POLICY "spare_parts_delete_policy" ON spare_parts
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR')
+  );
+
+-- 12. ATTENDANCE RECORDS POLICIES
+-- Technicians and Planners can only select their own attendance; Managers and Admins see team records
+CREATE POLICY "attendance_select_policy" ON attendance_records
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR') OR
+    user_id = auth.uid()::text
+  );
+
+CREATE POLICY "attendance_insert_policy" ON attendance_records
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    user_id = auth.uid()::text OR
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
+
+CREATE POLICY "attendance_update_policy" ON attendance_records
+  FOR UPDATE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
+
+-- 13. SYSTEM AUDIT LOGS POLICIES
+-- Read: Managers, Admins, Super Admin only
+CREATE POLICY "audit_logs_select_policy" ON system_audit_logs
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER', 'MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR')
+  );
+
+-- Insert: Permitted via audit logging helper / service_role
+CREATE POLICY "audit_logs_insert_policy" ON system_audit_logs
+  FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+-- IMMUTABLE AUDIT TRAIL: UPDATE AND DELETE ARE PERMANENTLY FORBIDDEN TO ALL USERS
+-- (No UPDATE or DELETE policy is defined, ensuring Postgres blocks mutation)
+
+-- 14. SOPS & DATA QUALITY
+CREATE POLICY "sops_select_policy" ON sops
+  FOR SELECT TO authenticated
+  USING (true);
+
+CREATE POLICY "data_quality_select_policy" ON data_quality_metrics
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER')
+  );
+
+-- 15. ROLE-BASED NOTIFICATIONS POLICIES
+ALTER TABLE IF EXISTS notifications ENABLE ROW LEVEL SECURITY;
+
+-- Read Policy: Strict Recipient and Role Isolation
+CREATE POLICY "notifications_select_policy" ON notifications
+  FOR SELECT TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR (
+      (factory_id = get_current_user_factory_id() OR factory_id IS NULL) AND (
+        (recipient_user_id IS NOT NULL AND recipient_user_id = auth.uid()::text) OR
+        (recipient_user_id IS NULL AND recipient_role IN (get_current_user_role(), 'ALL'))
+      )
+    )
+  );
+
+-- Insert Policy: Authorized operational actors or background processes
+CREATE POLICY "notifications_insert_policy" ON notifications
+  FOR INSERT TO authenticated
+  WITH CHECK (true);
+
+-- Update Policy: Users can only mark their own authorized notifications as read
+CREATE POLICY "notifications_update_policy" ON notifications
+  FOR UPDATE TO authenticated
+  USING (
+    get_current_user_role() = 'SUPER_ADMIN' OR (
+      (factory_id = get_current_user_factory_id() OR factory_id IS NULL) AND (
+        (recipient_user_id IS NOT NULL AND recipient_user_id = auth.uid()::text) OR
+        (recipient_user_id IS NULL AND recipient_role IN (get_current_user_role(), 'ALL'))
+      )
+    )
+  );
+
+-- Delete Policy: Users can only clear their own notifications; Admins can clear factory alerts
+CREATE POLICY "notifications_delete_policy" ON notifications
+  FOR DELETE TO authenticated
+  USING (
+    get_current_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FACTORY_OWNER') OR
+    (recipient_user_id IS NOT NULL AND recipient_user_id = auth.uid()::text)
+  );
 

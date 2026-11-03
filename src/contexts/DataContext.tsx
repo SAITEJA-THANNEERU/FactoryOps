@@ -9,21 +9,31 @@ import type {
   DataQualityMetric,
   FactoryKPIs,
   TechnicianProfile,
-  TechnicianIncidentAssignment
+  TechnicianIncidentAssignment,
+  AppNotification,
+  NotificationPriority,
+  NotificationType
 } from '../types/index.ts';
 import { api } from '../services/api.ts';
 import { useAuth } from './AuthContext.tsx';
 
 export interface OperationalNotification {
   id: string;
-  type: 'incident' | 'work_order' | 'machine';
+  type: string;
   title: string;
   description: string;
   timestamp: string;
   severity?: 'Critical' | 'High' | 'Medium' | 'Low' | string;
+  priority: NotificationPriority;
+  notification_type: NotificationType;
+  related_module: string;
+  related_record_id?: string;
   targetPath: string;
   read: boolean;
+  is_read: boolean;
   meta: string;
+  recipient_role?: string;
+  recipient_user_id?: string | null;
 }
 
 interface DataContextType {
@@ -44,9 +54,11 @@ interface DataContextType {
   refreshData: () => Promise<void>;
   refreshTechnicians: () => Promise<void>;
   refreshTechnicianAssignments: (status?: string) => Promise<void>;
+  refreshNotifications: () => Promise<void>;
   markNotificationAsRead: (id: string) => Promise<void>;
   markAllNotificationsAsRead: () => Promise<void>;
-  clearAllNotifications: () => void;
+  clearAllNotifications: () => Promise<void>;
+  deleteNotification: (id: string) => Promise<void>;
   createIncident: (data: { machine_id: string; title: string; description: string; severity: string }) => Promise<Incident>;
   createWorkOrder: (data: {
     machine_id: string;
@@ -112,6 +124,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return new Set();
     }
   });
+  const [serverNotifications, setServerNotifications] = useState<AppNotification[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -153,6 +166,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Single-factory mode: Apex (FAC-001) is the sole active factory
     const factoryId = activeFactory?.id || 'FAC-001';
+    // Only roles authorized to view Data Quality (Admin, Super Admin) query the data-quality endpoint
+    const canViewDataQuality = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'FACTORY_OWNER';
 
     try {
       const [
@@ -168,14 +183,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         techsData,
         assignmentsData
       ] = await Promise.all([
-        api.machines.getAll(factoryId),
-        api.production.getAll(factoryId),
-        api.maintenance.getAll(factoryId),
-        api.incidents.getAll(factoryId),
-        api.workOrders.getAll(factoryId),
-        api.sops.getAll(factoryId),
-        api.dataQuality.getAll(factoryId),
-        api.factories.getStats(factoryId),
+        api.machines.getAll(factoryId).catch(() => []),
+        api.production.getAll(factoryId).catch(() => []),
+        api.maintenance.getAll(factoryId).catch(() => []),
+        api.incidents.getAll(factoryId).catch(() => []),
+        api.workOrders.getAll(factoryId).catch(() => []),
+        api.sops.getAll(factoryId).catch(() => []),
+        canViewDataQuality ? api.dataQuality.getAll(factoryId).catch(() => []) : Promise.resolve([]),
+        api.factories.getStats(factoryId).catch(() => null),
         api.notifications.getAll().catch(() => null),
         api.technicians.getAll().catch(() => []),
         api.technicianAssignments.getAll().catch(() => [])
@@ -371,154 +386,157 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return res;
   };
 
-  // Derive notifications from live plant telemetry and incidents
+  const refreshNotifications = useCallback(async () => {
+    if (!isAuthenticated) return;
+    try {
+      const res = await api.notifications.getAll('all');
+      setServerNotifications(res.notifications || []);
+    } catch (err) {
+      console.warn('Failed to load role notifications:', err);
+    }
+  }, [isAuthenticated]);
+
+  // Connect to Real-time SSE Notification Stream
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setServerNotifications([]);
+      return;
+    }
+
+    refreshNotifications();
+
+    const token = localStorage.getItem('factoryops_auth_token');
+    if (!token) return;
+
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    function connectSSE() {
+      try {
+        const url = `/api/notifications/stream?token=${encodeURIComponent(token!)}`;
+        eventSource = new EventSource(url);
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (data.type === 'NOTIFICATION' && data.notification) {
+              setServerNotifications(prev => {
+                const exists = prev.some(n => n.id === data.notification.id);
+                if (exists) return prev;
+                return [data.notification, ...prev];
+              });
+            } else if (data.type === 'NOTIFICATION_READ' && Array.isArray(data.ids)) {
+              const readSet = new Set(data.ids);
+              setServerNotifications(prev =>
+                prev.map(n => readSet.has(n.id) ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
+              );
+              setReadNotificationIds(prev => {
+                const next = new Set(prev);
+                data.ids.forEach((id: string) => next.add(id));
+                return next;
+              });
+            } else if (data.type === 'NOTIFICATION_DELETED' && data.id) {
+              setServerNotifications(prev => prev.filter(n => n.id !== data.id));
+            }
+          } catch {}
+        };
+
+        eventSource.onerror = () => {
+          if (eventSource) {
+            eventSource.close();
+            eventSource = null;
+          }
+          reconnectTimeout = setTimeout(connectSSE, 5000);
+        };
+      } catch (err) {
+        console.warn('Failed to connect notification stream:', err);
+      }
+    }
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, [isAuthenticated, refreshNotifications]);
+
+  // Unified notifications list combining persistent database notifications & real-time telemetry
   const notifications = React.useMemo<OperationalNotification[]>(() => {
-    const list: OperationalNotification[] = [];
-
-    // 1. Incidents
-    incidents.forEach(inc => {
-      if (inc.status !== 'Closed') {
-        const id = `inc-${inc.id || inc.incident_id}`;
-        const isRead = readNotificationIds.has(id) ||
-                       (inc.id ? readNotificationIds.has(`inc-${inc.id}`) : false) ||
-                       (inc.incident_id ? readNotificationIds.has(`inc-${inc.incident_id}`) : false);
-        list.push({
-          id,
-          type: 'incident',
-          title: `${inc.severity} Incident: ${inc.incident_id || inc.id}`,
-          description: `${inc.title} - ${inc.description || 'Equipment anomaly'}`,
-          timestamp: inc.reported_at ? new Date(inc.reported_at).toLocaleString() : 'Recent shift',
-          severity: (inc.severity as any) || 'High',
-          targetPath: '/incidents',
-          read: isRead,
-          meta: `Machine: ${inc.machine_id} • Status: ${inc.status}`
-        });
-      }
-    });
-
-    // 2. Urgent / Active Work Orders
-    workOrders.forEach(wo => {
-      if (wo.status === 'Pending Parts' || wo.status === 'In Progress' || wo.priority === 'Critical' || wo.priority === 'High') {
-        const id = `wo-${wo.id || wo.work_order_id}`;
-        const isRead = readNotificationIds.has(id) ||
-                       (wo.id ? readNotificationIds.has(`wo-${wo.id}`) : false) ||
-                       (wo.work_order_id ? readNotificationIds.has(`wo-${wo.work_order_id}`) : false);
-        list.push({
-          id,
-          type: 'work_order',
-          title: `Work Order: ${wo.work_order_id || wo.id}`,
-          description: `${wo.title} (${wo.priority} Priority)`,
-          timestamp: wo.created_at ? new Date(wo.created_at).toLocaleString() : 'Active order',
-          severity: (wo.priority as any) || 'Medium',
-          targetPath: '/work-orders',
-          read: isRead,
-          meta: `Assigned: ${wo.assigned_to || 'Unassigned'} • Due: ${wo.due_date || 'ASAP'}`
-        });
-      }
-    });
-
-    // 3. Machines in Warning or Offline
-    machines.forEach(m => {
-      if (m.status === 'warning') {
-        const id = `mach-${m.id || m.machine_id}`;
-        const isRead = readNotificationIds.has(id) ||
-                       (m.id ? readNotificationIds.has(`mach-${m.id}`) : false) ||
-                       (m.machine_id ? readNotificationIds.has(`mach-${m.machine_id}`) : false);
-        list.push({
-          id,
-          type: 'machine',
-          title: `Telemetry Alert: ${m.machine_id || m.id}`,
-          description: `${m.name} operating at elevated telemetry (${m.temperature_c}°C / ${m.vibration_mms} mm/s)`,
-          timestamp: 'Live reading',
-          severity: 'High',
-          targetPath: '/machines',
-          read: isRead,
-          meta: `Line: ${m.line} • Health: ${m.health_score}%`
-        });
-      }
+    const list: OperationalNotification[] = serverNotifications.map(sn => {
+      const isRead = sn.is_read || readNotificationIds.has(sn.id);
+      return {
+        id: sn.id,
+        type: sn.related_module.toLowerCase().includes('machine') ? 'machine' :
+              sn.related_module.toLowerCase().includes('order') ? 'work_order' : 'incident',
+        title: sn.title,
+        description: sn.message,
+        timestamp: new Date(sn.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' }),
+        severity: sn.priority === 'CRITICAL' ? 'Critical' : sn.priority === 'HIGH' ? 'High' : sn.priority === 'MEDIUM' ? 'Medium' : 'Low',
+        priority: sn.priority,
+        notification_type: sn.notification_type,
+        related_module: sn.related_module,
+        related_record_id: sn.related_record_id,
+        targetPath: sn.target_path,
+        read: isRead,
+        is_read: isRead,
+        meta: sn.meta || `${sn.related_module} • ${sn.priority} Priority`,
+        recipient_role: sn.recipient_role,
+        recipient_user_id: sn.recipient_user_id
+      };
     });
 
     return list.filter(n => !clearedNotificationIds.has(n.id));
-  }, [incidents, workOrders, machines, readNotificationIds, clearedNotificationIds]);
+  }, [serverNotifications, readNotificationIds, clearedNotificationIds]);
 
   const unreadNotificationsCount = React.useMemo(() => {
-    return notifications.filter(n => !n.read).length;
+    return notifications.filter(n => !n.read && !n.is_read).length;
   }, [notifications]);
 
   const markNotificationAsRead = useCallback(async (id: string) => {
     setReadNotificationIds(prev => {
       const next = new Set(prev);
       next.add(id);
-
-      // Also mark ID variations
-      if (id.startsWith('inc-')) {
-        const raw = id.replace('inc-', '');
-        const found = incidents.find(i => String(i.id) === raw || String(i.incident_id) === raw);
-        if (found) {
-          if (found.id) next.add(`inc-${found.id}`);
-          if (found.incident_id) next.add(`inc-${found.incident_id}`);
-        }
-      } else if (id.startsWith('wo-')) {
-        const raw = id.replace('wo-', '');
-        const found = workOrders.find(w => String(w.id) === raw || String(w.work_order_id) === raw);
-        if (found) {
-          if (found.id) next.add(`wo-${found.id}`);
-          if (found.work_order_id) next.add(`wo-${found.work_order_id}`);
-        }
-      } else if (id.startsWith('mach-')) {
-        const raw = id.replace('mach-', '');
-        const found = machines.find(m => String(m.id) === raw || String(m.machine_id) === raw);
-        if (found) {
-          if (found.id) next.add(`mach-${found.id}`);
-          if (found.machine_id) next.add(`mach-${found.machine_id}`);
-        }
-      }
-
       try {
         localStorage.setItem('factoryops_read_notifications', JSON.stringify(Array.from(next)));
       } catch {}
       return next;
     });
+
+    setServerNotifications(prev =>
+      prev.map(n => n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n)
+    );
 
     try {
       await api.notifications.markRead(id);
     } catch (e) {
       console.warn('Failed to sync notification markRead with server:', e);
     }
-  }, [incidents, workOrders, machines]);
+  }, []);
 
   const markAllNotificationsAsRead = useCallback(async () => {
+    const allIds = notifications.map(n => n.id);
     setReadNotificationIds(prev => {
       const next = new Set(prev);
-      notifications.forEach(n => next.add(n.id));
-      incidents.forEach(inc => {
-        if (inc.id) next.add(`inc-${inc.id}`);
-        if (inc.incident_id) next.add(`inc-${inc.incident_id}`);
-      });
-      workOrders.forEach(wo => {
-        if (wo.id) next.add(`wo-${wo.id}`);
-        if (wo.work_order_id) next.add(`wo-${wo.work_order_id}`);
-      });
-      machines.forEach(m => {
-        if (m.id) next.add(`mach-${m.id}`);
-        if (m.machine_id) next.add(`mach-${m.machine_id}`);
-      });
-
+      allIds.forEach(id => next.add(id));
       try {
         localStorage.setItem('factoryops_read_notifications', JSON.stringify(Array.from(next)));
       } catch {}
       return next;
     });
 
+    setServerNotifications(prev =>
+      prev.map(n => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
+    );
+
     try {
-      const allIds = notifications.map(n => n.id);
-      await api.notifications.markAllRead(allIds);
+      await api.notifications.markAllRead();
     } catch (e) {
       console.warn('Failed to sync markAllRead with server:', e);
     }
-  }, [notifications, incidents, workOrders, machines]);
+  }, [notifications]);
 
-  const clearAllNotifications = useCallback(() => {
+  const clearAllNotifications = useCallback(async () => {
     setClearedNotificationIds(prev => {
       const next = new Set(prev);
       notifications.forEach(n => next.add(n.id));
@@ -527,7 +545,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch {}
       return next;
     });
+    setServerNotifications([]);
   }, [notifications]);
+
+  const deleteNotification = useCallback(async (id: string) => {
+    setServerNotifications(prev => prev.filter(n => n.id !== id));
+    setClearedNotificationIds(prev => {
+      const next = new Set(prev);
+      next.add(id);
+      try {
+        localStorage.setItem('factoryops_cleared_notifications', JSON.stringify(Array.from(next)));
+      } catch {}
+      return next;
+    });
+    try {
+      await api.notifications.delete(id);
+    } catch (e) {
+      console.warn('Failed to delete notification:', e);
+    }
+  }, []);
 
   const assignTechnicianToIncident = useCallback(async (data: Partial<TechnicianIncidentAssignment>) => {
     const res = await api.technicianAssignments.assign(data);
@@ -608,9 +644,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         refreshData,
         refreshTechnicians,
         refreshTechnicianAssignments,
+        refreshNotifications,
         markNotificationAsRead,
         markAllNotificationsAsRead,
         clearAllNotifications,
+        deleteNotification,
         createIncident,
         updateIncident,
         deleteIncident,
