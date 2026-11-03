@@ -53,6 +53,7 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
   isManagerView = false,
   onVerify
 }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showProgressUpdates, setShowProgressUpdates] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -89,22 +90,22 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
   const getStatusBadge = () => {
     if (isPendingAcceptance) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
-          <Clock className="w-3.5 h-3.5 text-amber-600" /> Pending Acceptance
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
+          <Clock className="w-3.5 h-3.5 text-emerald-600" /> Pending
         </span>
       );
     }
     if (isAccepted) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
-          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Accepted – Ready for LOTO
+          <CheckCircle2 className="w-3.5 h-3.5 text-blue-600" /> Accepted
         </span>
       );
     }
     if (isInProgress) {
       return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-sky-100 text-sky-900 border border-sky-300">
-          <Wrench className="w-3.5 h-3.5 text-sky-600" /> In Progress ({assignment.repair_progress_percent}%)
+        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-blue-100 text-blue-900 border border-blue-300">
+          <Wrench className="w-3.5 h-3.5 text-blue-600" /> In Progress
         </span>
       );
     }
@@ -125,7 +126,7 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
     if (isRejected) {
       return (
         <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-bold bg-rose-100 text-rose-900 border border-rose-300">
-          <XCircle className="w-3.5 h-3.5 text-rose-600" /> Assignment Rejected
+          <XCircle className="w-3.5 h-3.5 text-rose-600" /> Rejected
         </span>
       );
     }
@@ -159,10 +160,10 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
         </span>
       );
     }
-    if (prio === 'Medium') {
+    if (prio === 'Medium' || prio === 'Med' || prio === 'MED') {
       return (
-        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase bg-blue-100 text-blue-900 border border-blue-300">
-          MEDIUM
+        <span className="px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase bg-amber-100 text-amber-900 border border-amber-300">
+          MED
         </span>
       );
     }
@@ -246,13 +247,88 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
     }
   };
 
+  // Compact Collapsed Card View
+  if (!isExpanded) {
+    return (
+      <div className={`bg-white border rounded-2xl p-4 shadow-2xs hover:shadow-xs transition-all ${
+        assignment.is_overdue
+          ? 'border-rose-300 bg-rose-50/10'
+          : 'border-slate-200/90'
+      }`}>
+        <div
+          onClick={() => setIsExpanded(true)}
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer select-none"
+        >
+          {/* Left: Priority Badge + Incident ID & Machine Code + Title + Time/Due */}
+          <div className="flex items-start gap-3 min-w-0 flex-1">
+            <div className="shrink-0 pt-0.5">
+              {getPriorityBadge()}
+            </div>
+
+            <div className="min-w-0 flex-1 space-y-1">
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-mono font-bold">
+                <span>{assignment.incident_id || assignment.id}</span>
+                <span>|</span>
+                <span>{assignment.machine_code || assignment.machine_id}</span>
+              </div>
+
+              <h4 className="text-sm font-black text-slate-900 tracking-tight line-clamp-1">
+                {assignment.incident_title}
+              </h4>
+
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-600 font-medium pt-0.5">
+                <span className="flex items-center gap-1">
+                  <Clock className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Est. Time: <strong className="text-slate-900 font-bold">{assignment.estimated_repair_hours} hrs</strong></span>
+                </span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-slate-500" />
+                  <span>Due: <strong className={assignment.is_overdue ? 'text-rose-600 font-bold' : 'text-slate-900 font-bold'}>
+                    {new Date(assignment.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </strong></span>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: Progress % + Status + Progress Bar + Downward Arrow */}
+          <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-extrabold text-slate-900 font-mono">{assignment.repair_progress_percent || 0}%</span>
+              {getStatusBadge()}
+            </div>
+
+            <div className="hidden md:block w-28 h-2 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+              <div
+                className="h-full bg-[#794628] rounded-full"
+                style={{ width: `${Math.min(100, Math.max(0, assignment.repair_progress_percent || 0))}%` }}
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(true);
+              }}
+              className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition cursor-pointer shrink-0"
+              aria-label="Expand task details"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`bg-white border rounded-2xl p-5 space-y-4 shadow-xs transition-all hover:shadow-md ${
       assignment.is_overdue
         ? 'border-rose-300'
         : 'border-slate-200/90'
     }`}>
-      {/* Top Header Row */}
+      {/* Top Header Row with Collapse Arrow */}
       <div className="flex flex-wrap items-center justify-between gap-2.5 pb-2 border-b border-slate-100">
         <div className="flex flex-wrap items-center gap-2">
           {getPriorityBadge()}
@@ -267,11 +343,22 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
           </span>
         </div>
 
-        <div className="text-xs text-slate-700 font-mono flex items-center gap-1.5 font-bold">
-          <Calendar className="w-3.5 h-3.5 text-slate-500" />
-          <span>Due: <strong className={assignment.is_overdue ? 'text-rose-600' : 'text-slate-900'}>
-            {new Date(assignment.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </strong></span>
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-slate-700 font-mono flex items-center gap-1.5 font-bold">
+            <Calendar className="w-3.5 h-3.5 text-slate-500" />
+            <span>Due: <strong className={assignment.is_overdue ? 'text-rose-600' : 'text-slate-900'}>
+              {new Date(assignment.due_date).toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            </strong></span>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setIsExpanded(false)}
+            className="w-8 h-8 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-600 hover:text-slate-900 transition cursor-pointer shrink-0"
+            aria-label="Collapse task details"
+          >
+            <ChevronUp className="w-4 h-4" />
+          </button>
         </div>
       </div>
 

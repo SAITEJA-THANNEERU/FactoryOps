@@ -452,7 +452,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
 
         {/* Assignments Cards Grid */}
         {filteredAssignments.length > 0 ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-3">
             {filteredAssignments.map(asn => (
               <TechnicianAssignmentCard
                 key={asn.id}
