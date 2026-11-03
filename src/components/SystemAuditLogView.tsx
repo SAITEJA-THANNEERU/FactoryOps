@@ -9,13 +9,16 @@ export const SystemAuditLogView: React.FC = () => {
   const [search, setSearch] = useState('');
   const [selectedEntity, setSelectedEntity] = useState('All');
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const fetchLogs = async () => {
     try {
       setLoading(true);
+      setErrorMessage(null);
       const data = await api.auditLogs.getAll();
       setLogs(data);
     } catch (err: any) {
-      console.error('Failed to fetch system audit logs:', err);
+      setErrorMessage(err?.message || 'Failed to fetch audit logs');
     } finally {
       setLoading(false);
     }
@@ -94,6 +97,16 @@ export const SystemAuditLogView: React.FC = () => {
       {loading ? (
         <div className="py-8 text-center text-slate-400 text-xs">
           Loading audit records...
+        </div>
+      ) : errorMessage ? (
+        <div className="py-6 px-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-center justify-between">
+          <span>{errorMessage}</span>
+          <button
+            onClick={fetchLogs}
+            className="text-amber-900 font-semibold underline hover:text-amber-950 cursor-pointer"
+          >
+            Retry
+          </button>
         </div>
       ) : filteredLogs.length === 0 ? (
         <div className="py-8 text-center text-slate-500 text-xs">
