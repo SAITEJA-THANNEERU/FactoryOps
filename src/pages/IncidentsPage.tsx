@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useData } from '../contexts/DataContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { SeverityBadge } from '../components/SeverityBadge.tsx';
 import { StatusBadge } from '../components/StatusBadge.tsx';
 import { CreateIncidentModal } from '../components/CreateIncidentModal.tsx';
@@ -11,6 +12,9 @@ import type { Incident } from '../types/index.ts';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
 export const IncidentsPage: React.FC = () => {
+  const { user } = useAuth();
+  const isManager = user?.role ? ['MANAGER_SUPERVISOR', 'FACTORY_MANAGER', 'SUPERVISOR', 'ADMIN', 'FACTORY_OWNER', 'SUPER_ADMIN'].includes(user.role) : false;
+
   const {
     incidents,
     machines,
@@ -81,13 +85,15 @@ export const IncidentsPage: React.FC = () => {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setIsIncidentSelectionOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>AI Dispatch Hub</span>
-          </button>
+          {isManager && (
+            <button
+              onClick={() => setIsIncidentSelectionOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>AI Dispatch Hub</span>
+            </button>
+          )}
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
@@ -166,17 +172,19 @@ export const IncidentsPage: React.FC = () => {
                     <td className="py-3 px-4 max-w-xs text-slate-600">{inc.root_cause || 'Under investigation'}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          onClick={() => {
-                            setSelectedIncidentForAssign(inc.id || inc.incident_id);
-                            setIsAssignModalOpen(true);
-                          }}
-                          title="Assign incident to technician using AI skill matching"
-                          className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <Sparkles className="w-3 h-3 text-indigo-600" />
-                          <span>AI Assign Tech</span>
-                        </button>
+                        {isManager && (
+                          <button
+                            onClick={() => {
+                              setSelectedIncidentForAssign(inc.id || inc.incident_id);
+                              setIsAssignModalOpen(true);
+                            }}
+                            title="Assign incident to technician using AI skill matching"
+                            className="px-2 py-1 rounded bg-indigo-50 hover:bg-indigo-100 text-indigo-800 border border-indigo-200 text-[11px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                          >
+                            <Sparkles className="w-3 h-3 text-indigo-600" />
+                            <span>AI Assign Tech</span>
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setSelectedIncidentForWO(inc);

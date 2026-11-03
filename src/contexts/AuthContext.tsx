@@ -78,6 +78,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(res.token);
       setInspectingFactory(null);
       api.setInspectingFactoryId(null);
+
+      // Always land on the role's Overview (Dashboard) page after login
+      const targetPath = res.user.role === 'SUPER_ADMIN' ? '/super-admin/overview' : '/dashboard';
+      window.history.pushState({}, '', targetPath);
+      window.dispatchEvent(new PopStateEvent('popstate'));
     } catch (err: any) {
       setError(err.message || 'Login failed');
       throw err;
@@ -97,6 +102,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setToken(null);
       api.setInspectingFactoryId(null);
       setIsLoading(false);
+
+      // Reset location to /login upon logout so no previous navigation state persists
+      window.history.pushState({}, '', '/login');
+      window.dispatchEvent(new PopStateEvent('popstate'));
     }
   };
 

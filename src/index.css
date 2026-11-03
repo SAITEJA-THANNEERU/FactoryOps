@@ -140,3 +140,62 @@
   animation: weldSpark 1.5s ease-in-out infinite;
 }
 
+/* Prevent unwanted browser focus outlines/borders around Recharts SVG charts & containers when clicked */
+.recharts-responsive-container,
+.recharts-wrapper,
+.recharts-surface,
+.recharts-layer,
+.recharts-sector,
+.recharts-bar-rectangle,
+.recharts-rectangle,
+.recharts-pie,
+.recharts-pie-sector,
+.recharts-cartesian-grid,
+.recharts-active-bar,
+.recharts-tooltip-cursor,
+div[class*="recharts"],
+svg[class*="recharts"] {
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.recharts-responsive-container:focus,
+.recharts-responsive-container:focus-within,
+.recharts-responsive-container:focus-visible,
+.recharts-responsive-container:active,
+.recharts-wrapper:focus,
+.recharts-wrapper:focus-within,
+.recharts-wrapper:focus-visible,
+.recharts-wrapper:active,
+.recharts-surface:focus,
+.recharts-surface:focus-visible,
+.recharts-surface:active,
+.recharts-layer:focus,
+.recharts-layer:focus-visible,
+.recharts-sector:focus,
+.recharts-sector:focus-visible,
+.recharts-bar-rectangle:focus,
+.recharts-bar-rectangle:focus-visible,
+div[class*="recharts"]:focus,
+div[class*="recharts"]:focus-within,
+div[class*="recharts"]:focus-visible,
+svg[class*="recharts"]:focus,
+svg[class*="recharts"]:focus-visible,
+svg[class*="recharts"] *:focus,
+svg[class*="recharts"] *:focus-visible,
+svg[class*="recharts"] *:active {
+  outline: 0 !important;
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Ensure focus-visible on SVG elements doesn't draw default browser black rectangle border */
+svg:focus,
+svg:focus-visible,
+svg *:focus,
+svg *:focus-visible {
+  outline: none !important;
+}
+

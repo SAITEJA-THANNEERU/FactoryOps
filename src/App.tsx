@@ -33,19 +33,34 @@ const AppContent: React.FC = () => {
   const { user, isAuthenticated, isLoading, inspectingFactory } = useAuth();
   const { currentPath, navigate } = useRouter();
 
+  // Track previous authenticated user ID to force role Overview navigation on login
+  const prevUserIdRef = React.useRef<string | null>(null);
+
   // Route protection & role redirection
   useEffect(() => {
     if (!isLoading && isAuthenticated && user) {
+      const isFreshLogin = prevUserIdRef.current !== user.id;
+      prevUserIdRef.current = user.id;
+
+      if (isFreshLogin) {
+        // Whenever any user logs in, always land on their respective Overview (Dashboard) page
+        const overviewPath = user.role === 'SUPER_ADMIN' && !inspectingFactory ? '/super-admin/overview' : '/dashboard';
+        navigate(overviewPath);
+        return;
+      }
+
       if (user.role === 'SUPER_ADMIN' && !inspectingFactory) {
         if (!currentPath.startsWith('/super-admin')) {
           navigate('/super-admin/overview');
         }
       } else {
-        // Factory Owner or Factory Manager must NEVER access /super-admin routes
+        // Non-super-admin roles must NEVER access /super-admin routes or auth pages
         if (currentPath.startsWith('/super-admin') || currentPath === '/' || currentPath === '/login' || currentPath === '/register') {
           navigate('/dashboard');
         }
       }
+    } else if (!isAuthenticated) {
+      prevUserIdRef.current = null;
     }
   }, [isLoading, isAuthenticated, user, inspectingFactory, currentPath, navigate]);
 
