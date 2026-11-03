@@ -9,7 +9,6 @@ import {
   Trash2,
   DollarSign,
   Truck,
-  Filter,
   X,
   RotateCcw,
   Check
@@ -27,9 +26,6 @@ export const InventoryPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [showOnlyLowStock, setShowOnlyLowStock] = useState<boolean>(false);
-
-  // Advanced Filter Panel state
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState<boolean>(false);
   const [selectedStockLevel, setSelectedStockLevel] = useState<string>('ALL');
   const [selectedSupplier, setSelectedSupplier] = useState<string>('ALL');
   const [selectedCostTier, setSelectedCostTier] = useState<string>('ALL');
@@ -349,124 +345,6 @@ export const InventoryPage: React.FC = () => {
                   {cat}
                 </button>
               ))}
-            </div>
-
-            {/* Filter Funnel Icon Button */}
-            <div className="relative shrink-0">
-              <button
-                onClick={() => setIsFilterPanelOpen(prev => !prev)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer border ${
-                  isFilterPanelOpen || selectedStockLevel !== 'ALL' || selectedSupplier !== 'ALL' || selectedCostTier !== 'ALL'
-                    ? 'bg-[#0E79B2] text-white border-[#0E79B2] shadow-2xs'
-                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                }`}
-                title="Open Advanced Inventory Filters"
-              >
-                <Filter className="w-3.5 h-3.5" />
-                <span>Filter</span>
-                {(selectedStockLevel !== 'ALL' || selectedSupplier !== 'ALL' || selectedCostTier !== 'ALL') && (
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 ring-2 ring-white"></span>
-                )}
-              </button>
-
-              {/* Filter Panel Dropdown Popover */}
-              {isFilterPanelOpen && (
-                <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 z-40 space-y-4 animate-in fade-in zoom-in-95 duration-150">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-                    <div className="flex items-center gap-2">
-                      <Filter className="w-4 h-4 text-[#0E79B2]" />
-                      <h3 className="text-xs font-bold text-[#191923] uppercase tracking-wide">
-                        Inventory Filter Options
-                      </h3>
-                    </div>
-                    <button
-                      onClick={() => setIsFilterPanelOpen(false)}
-                      className="p-1 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-100 cursor-pointer"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-3 text-xs">
-                    {/* Filter 1: Category */}
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Part Category</label>
-                      <select
-                        value={selectedCategory}
-                        onChange={e => setSelectedCategory(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:ring-1 focus:ring-[#0E79B2]"
-                      >
-                        {categories.map(cat => (
-                          <option key={cat} value={cat}>{cat}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Filter 2: Stock Level */}
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Stock Level Status</label>
-                      <select
-                        value={selectedStockLevel}
-                        onChange={e => setSelectedStockLevel(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:ring-1 focus:ring-[#0E79B2]"
-                      >
-                        <option value="ALL">All Stock Levels</option>
-                        <option value="LOW_STOCK">Low Stock (≤ Reorder Threshold)</option>
-                        <option value="IN_STOCK">In Stock (Healthy Supply)</option>
-                        <option value="OUT_OF_STOCK">Out of Stock (0 Quantity)</option>
-                      </select>
-                    </div>
-
-                    {/* Filter 3: Approved Supplier */}
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Supplier</label>
-                      <select
-                        value={selectedSupplier}
-                        onChange={e => setSelectedSupplier(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:ring-1 focus:ring-[#0E79B2]"
-                      >
-                        <option value="ALL">All Approved Suppliers</option>
-                        {suppliers.map(sup => (
-                          <option key={sup} value={sup}>{sup}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Filter 4: Unit Cost Range */}
-                    <div>
-                      <label className="block text-slate-600 font-bold mb-1">Unit Cost Tier</label>
-                      <select
-                        value={selectedCostTier}
-                        onChange={e => setSelectedCostTier(e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-slate-900 focus:ring-1 focus:ring-[#0E79B2]"
-                      >
-                        <option value="ALL">All Price Tiers</option>
-                        <option value="UNDER_50">Under $50</option>
-                        <option value="50_TO_200">$50 – $200</option>
-                        <option value="OVER_200">Over $200</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  {/* Filter Actions */}
-                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      onClick={resetAllFilters}
-                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100 text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5" />
-                      <span>Reset Filters</span>
-                    </button>
-                    <button
-                      onClick={() => setIsFilterPanelOpen(false)}
-                      className="flex items-center gap-1.5 px-4 py-1.5 bg-[#0E79B2] hover:bg-[#0c6799] text-white text-xs font-bold rounded-lg shadow-2xs cursor-pointer transition-colors"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Apply ({filteredParts.length})</span>
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

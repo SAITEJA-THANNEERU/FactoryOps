@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
-  Filter,
   Maximize2,
   Minimize2,
   MoreHorizontal,
@@ -93,7 +92,6 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
     resetFilters
   } = useFilters();
 
-  const [isFilterActive, setIsFilterActive] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [isOptionsOpen, setIsOptionsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -111,13 +109,6 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const handleFilterToggle = () => {
-    setIsFilterActive(prev => !prev);
-    if (onFilterClick) {
-      onFilterClick();
-    }
-  };
 
   const handleFocusModeToggle = () => {
     setIsFocusMode(prev => {
@@ -200,24 +191,7 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
         <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 relative">
           {actions}
           <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-lg border border-slate-200/80">
-            {/* Button 1: Toggle Filter Pane */}
-            <button
-              onClick={handleFilterToggle}
-              className={`p-1.5 rounded transition-colors cursor-pointer relative ${
-                isFilterActive || selectedLine !== 'all' || selectedShift !== 'all' || selectedStatus !== 'all'
-                  ? 'bg-[#0E79B2] text-white shadow-2xs'
-                  : 'text-slate-600 hover:bg-white hover:text-[#0E79B2]'
-              }`}
-              title="Toggle Operational Filter Pane"
-              aria-label="Toggle Filter Pane"
-            >
-              <Filter className="w-3.5 h-3.5" />
-              {(isFilterActive || selectedLine !== 'all' || selectedShift !== 'all' || selectedStatus !== 'all') && (
-                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white"></span>
-              )}
-            </button>
-
-            {/* Button 2: Focus Mode */}
+            {/* Button 1: Focus Mode */}
             <button
               onClick={handleFocusModeToggle}
               className={`p-1.5 rounded transition-colors cursor-pointer ${
@@ -231,7 +205,7 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
               {isFocusMode ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
             </button>
 
-            {/* Button 3: Dashboard Options Dropdown */}
+            {/* Button 2: Dashboard Options Dropdown */}
             <div className="relative" ref={optionsRef}>
               <button
                 onClick={() => setIsOptionsOpen(prev => !prev)}
@@ -301,101 +275,6 @@ export const PowerBiBanner: React.FC<PowerBiBannerProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Operational Filter Drawer Panel */}
-      {isFilterActive && (
-        <div className="w-full bg-slate-50 border border-slate-200/90 rounded-xl p-3 mb-3 shadow-inner animate-in fade-in slide-in-from-top-2 duration-150">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
-            <div className="flex items-center gap-2">
-              <Filter className="w-3.5 h-3.5 text-[#0E79B2]" />
-              <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                Operational Filter Console
-              </span>
-            </div>
-            <button
-              onClick={() => setIsFilterActive(false)}
-              className="text-slate-400 hover:text-slate-700 p-1 rounded-md text-xs font-bold cursor-pointer"
-            >
-              ✕
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3 text-xs">
-            <div>
-              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Production Line</label>
-              <select
-                value={selectedLine}
-                onChange={e => setSelectedLine(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
-              >
-                <option value="all">All Lines</option>
-                <option value="Line 1 - Machining">Line 1 - Machining</option>
-                <option value="Line 2 - Assembly">Line 2 - Assembly</option>
-                <option value="Line 3 - Quality">Line 3 - Quality</option>
-                <option value="Line 4 - Coating">Line 4 - Coating</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Shift</label>
-              <select
-                value={selectedShift}
-                onChange={e => setSelectedShift(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
-              >
-                <option value="all">All Shifts</option>
-                <option value="A">Shift A (Morning)</option>
-                <option value="B">Shift B (Afternoon)</option>
-                <option value="C">Shift C (Night)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Equipment Status</label>
-              <select
-                value={selectedStatus}
-                onChange={e => setSelectedStatus(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
-              >
-                <option value="all">All Statuses</option>
-                <option value="running">Running</option>
-                <option value="warning">Warning</option>
-                <option value="maintenance">Maintenance</option>
-                <option value="offline">Offline</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-slate-500 font-bold mb-1 text-[11px]">Telemetry Period</label>
-              <select
-                value={timeRange}
-                onChange={e => setTimeRange(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-slate-800 font-medium focus:outline-hidden focus:border-[#0E79B2]"
-              >
-                <option value="24h">Last 24 Hours</option>
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="ytd">Year to Date</option>
-              </select>
-            </div>
-
-            <div className="col-span-2 sm:col-span-4 lg:col-span-1 flex items-end justify-between lg:justify-end gap-2 pt-1">
-              <button
-                onClick={resetFilters}
-                className="px-3 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg font-bold text-[11px] transition-colors cursor-pointer"
-              >
-                Reset
-              </button>
-              <button
-                onClick={() => setIsFilterActive(false)}
-                className="px-3 py-1.5 bg-[#0E79B2] hover:bg-[#0c6799] text-white rounded-lg font-bold text-[11px] shadow-2xs transition-colors cursor-pointer"
-              >
-                Apply
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
