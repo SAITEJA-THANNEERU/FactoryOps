@@ -93,12 +93,53 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
     deleteNotification(id);
   };
 
+  const resolveNotificationNavigation = (notification: NotificationItem): string => {
+    let target = notification.targetPath || (notification as any).target_path || '/';
+    if (!target.startsWith('/')) {
+      target = `/${target}`;
+    }
+
+    const mod = (notification.related_module || '').toLowerCase();
+    const type = (notification.notification_type || notification.type || '').toLowerCase();
+    const recordId = notification.related_record_id;
+
+    if (mod.includes('incident') || type.includes('incident')) {
+      target = '/incidents';
+    } else if (mod.includes('work') || type.includes('work_order') || type.includes('assignment') || type.includes('technician_assignment')) {
+      target = '/work-orders';
+    } else if (mod.includes('machine') || type.includes('machine') || type.includes('telemetry')) {
+      target = '/machines';
+    } else if (mod.includes('production') || type.includes('production')) {
+      target = '/production';
+    } else if (mod.includes('maintenance')) {
+      target = '/maintenance';
+    } else if (mod.includes('inventory') || type.includes('inventory')) {
+      target = '/inventory';
+    } else if (mod.includes('security') || type.includes('security') || type.includes('system')) {
+      target = '/super-admin/overview';
+    } else if (target.includes('dashboard')) {
+      if (mod.includes('incident')) target = '/incidents';
+      else if (mod.includes('work')) target = '/work-orders';
+      else if (mod.includes('machine')) target = '/machines';
+      else if (mod.includes('production')) target = '/production';
+      else if (mod.includes('maintenance')) target = '/maintenance';
+    }
+
+    if (recordId) {
+      const sep = target.includes('?') ? '&' : '?';
+      if (!target.includes('highlight=') && !target.includes('id=')) {
+        target = `${target}${sep}highlight=${encodeURIComponent(recordId)}`;
+      }
+    }
+
+    return target;
+  };
+
   const handleItemClick = (notification: NotificationItem) => {
     markNotificationAsRead(notification.id);
     onClose();
-    if (notification.targetPath) {
-      navigate(notification.targetPath);
-    }
+    const destination = resolveNotificationNavigation(notification);
+    navigate(destination);
   };
 
   const renderPriorityBadge = (priority?: string, severity?: string) => {
