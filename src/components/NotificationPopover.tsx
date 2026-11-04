@@ -45,7 +45,9 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
   const { navigate } = useRouter();
 
   const [activeTab, setActiveTab] = useState<'all' | 'unread' | 'critical'>('all');
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const filteredNotifications = notifications.filter(n => {
     if (activeTab === 'unread') return !n.read && !n.is_read;
@@ -53,7 +55,12 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
     return true;
   });
 
-  // Handle clicking outside & Escape
+  // Reset selected item when panel opens or active tab changes
+  useEffect(() => {
+    setSelectedIndex(-1);
+  }, [isOpen, activeTab]);
+
+  // Handle clicking outside & Keyboard Shortcuts (N, Esc, Arrow keys, Enter, Left/Right arrows)
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
       if (!isOpen) return;
@@ -67,19 +74,75 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
       }
     };
 
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      const target = e.target as HTMLElement;
+      const isInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
         onClose();
+        return;
+      }
+
+      if (isInput) return;
+
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(prev => {
+          if (filteredNotifications.length === 0) return -1;
+          return prev < filteredNotifications.length - 1 ? prev + 1 : 0;
+        });
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(prev => {
+          if (filteredNotifications.length === 0) return -1;
+          return prev > 0 ? prev - 1 : filteredNotifications.length - 1;
+        });
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault();
+        setActiveTab(prev => {
+          if (prev === 'all') return 'unread';
+          if (prev === 'unread') return 'critical';
+          return 'all';
+        });
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault();
+        setActiveTab(prev => {
+          if (prev === 'critical') return 'unread';
+          if (prev === 'unread') return 'all';
+          return 'critical';
+        });
+      } else if (e.key === 'Enter') {
+        if (selectedIndex >= 0 && selectedIndex < filteredNotifications.length) {
+          e.preventDefault();
+          handleItemClick(filteredNotifications[selectedIndex]);
+        }
       }
     };
 
     document.addEventListener('mousedown', handleOutsideClick);
-    window.addEventListener('keydown', handleEscape);
+    window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
-      window.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, anchorRef]);
+  }, [isOpen, onClose, anchorRef, filteredNotifications, selectedIndex]);
+
+  // Auto scroll focused item into view
+  useEffect(() => {
+    if (selectedIndex >= 0 && itemRefs.current[selectedIndex]) {
+      itemRefs.current[selectedIndex]?.scrollIntoView({
+        block: 'nearest',
+        behavior: 'smooth'
+      });
+    }
+  }, [selectedIndex]);
 
   const handleMarkAsRead = (id: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -319,14 +382,19 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
             </p>
           </div>
         ) : (
-          filteredNotifications.map(item => {
+          filteredNotifications.map((item, idx) => {
             const isUnread = !item.read && !item.is_read;
+            const isFocused = idx === selectedIndex;
+
             return (
               <div
                 key={item.id}
+                ref={el => { itemRefs.current[idx] = el; }}
                 onClick={() => handleItemClick(item)}
                 className={`p-4 rounded-2xl transition-all cursor-pointer flex items-start gap-3.5 relative border shadow-xs group hover:shadow-md ${
-                  isUnread
+                  isFocused
+                    ? 'bg-sky-50/90 border-[#0E79B2] ring-2 ring-[#0E79B2] shadow-md z-10'
+                    : isUnread
                     ? 'bg-white border-[#0E79B2]/40 ring-1 ring-[#0E79B2]/20'
                     : 'bg-white/90 border-slate-200 opacity-90 hover:opacity-100'
                 }`}
@@ -352,6 +420,11 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
                       {item.related_module && (
                         <span className="px-2.5 py-0.5 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 truncate">
                           {item.related_module}
+                        </span>
+                      )}
+                      {isFocused && (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-[#0E79B2] text-white animate-pulse shadow-2xs">
+                          ↵ Enter to open
                         </span>
                       )}
                     </div>
@@ -408,18 +481,31 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
         )}
       </div>
 
-      {/* Footer matching reference image */}
-      <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 font-medium">
-        <div className="flex items-center gap-2">
-          <Info className="w-4 h-4 text-[#0E79B2]" />
-          <span>Click any card to open relevant module</span>
+      {/* Footer with Keyboard Shortcut Hints */}
+      <div className="bg-slate-50 px-4 py-2.5 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-600 font-medium">
+        <div className="flex items-center gap-2 text-slate-700">
+          <Info className="w-4 h-4 text-[#0E79B2] shrink-0" />
+          <span className="hidden xs:inline">Click card or use keyboard shortcuts</span>
+          <span className="xs:hidden">Shortcuts available</span>
         </div>
-        <button
-          onClick={onClose}
-          className="px-4 py-1.5 rounded-xl text-xs font-bold bg-[#E1EEF6] hover:bg-[#cbe3f3] text-[#0E79B2] transition cursor-pointer shadow-2xs"
-        >
-          Dismiss
-        </button>
+
+        <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono flex-wrap justify-end">
+          <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs font-bold text-slate-700">
+            <kbd>N</kbd> Toggle
+          </span>
+          <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs font-bold text-slate-700">
+            <kbd>↑↓</kbd> Nav
+          </span>
+          <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs font-bold text-slate-700">
+            <kbd>←→</kbd> Tabs
+          </span>
+          <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs font-bold text-slate-700">
+            <kbd>↵</kbd> Open
+          </span>
+          <span className="inline-flex items-center gap-1 bg-white border border-slate-200 px-1.5 py-0.5 rounded shadow-2xs font-bold text-slate-700">
+            <kbd>Esc</kbd> Close
+          </span>
+        </div>
       </div>
     </div>
   );

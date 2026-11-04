@@ -238719,6 +238719,162 @@
   ],
   "systemAuditLogs": [
     {
+      "id": "LOG-1793791586259-784",
+      "factory_id": "FAC-001",
+      "user_id": "USR-014",
+      "user_name": "Praveen Nair (Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.vertex@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-014",
+      "details": "User Praveen Nair (Technician) (TECHNICIAN) authenticated successfully",
+      "timestamp": "2026-11-04T11:26:26.259Z"
+    },
+    {
+      "id": "LOG-1793791586083-528",
+      "factory_id": "FAC-001",
+      "user_id": "USR-013",
+      "user_name": "Anil Sharma (Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.nova@factoryops.com",
+      "action": "UNAUTHORIZED_ACCESS_ATTEMPT",
+      "entity_type": "ApiRoute",
+      "entity_id": "/api/audit-logs",
+      "details": "Access denied to GET /api/audit-logs. Required: [ADMIN, SUPER_ADMIN, MANAGER_SUPERVISOR], actual: 'TECHNICIAN'",
+      "timestamp": "2026-11-04T11:26:26.083Z"
+    },
+    {
+      "id": "LOG-1793791585258-677",
+      "factory_id": "FAC-001",
+      "user_id": "USR-013",
+      "user_name": "Anil Sharma (Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.nova@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-013",
+      "details": "User Anil Sharma (Technician) (TECHNICIAN) authenticated successfully",
+      "timestamp": "2026-11-04T11:26:25.258Z"
+    },
+    {
+      "id": "LOG-1793791219817-732",
+      "factory_id": "FAC-001",
+      "user_id": "USR-018",
+      "user_name": "Vikram Singh (Automation & Robotics Tech)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.robotics@factoryops.com",
+      "action": "UNAUTHORIZED_ACCESS_ATTEMPT",
+      "entity_type": "ApiRoute",
+      "entity_id": "/api/audit-logs",
+      "details": "Access denied to GET /api/audit-logs. Required: [ADMIN, SUPER_ADMIN, MANAGER_SUPERVISOR], actual: 'TECHNICIAN'",
+      "timestamp": "2026-11-04T11:20:19.817Z"
+    },
+    {
+      "id": "LOG-1793791218754-108",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "UNAUTHORIZED_ACCESS_ATTEMPT",
+      "entity_type": "ApiRoute",
+      "entity_id": "/api/audit-logs",
+      "details": "Access denied to GET /api/audit-logs. Required: [ADMIN, SUPER_ADMIN, MANAGER_SUPERVISOR], actual: 'TECHNICIAN'",
+      "timestamp": "2026-11-04T11:20:18.754Z"
+    },
+    {
+      "id": "LOG-1793791217760-751",
+      "factory_id": "FAC-001",
+      "user_id": "USR-015",
+      "user_name": "Priya Sundaram (Production Planner)",
+      "user_role": "PRODUCTION_PLANNER",
+      "user_email": "planner.apex@factoryops.com",
+      "action": "UNAUTHORIZED_ACCESS_ATTEMPT",
+      "entity_type": "ApiRoute",
+      "entity_id": "/api/audit-logs",
+      "details": "Access denied to GET /api/audit-logs. Required: [ADMIN, SUPER_ADMIN, MANAGER_SUPERVISOR], actual: 'PRODUCTION_PLANNER'",
+      "timestamp": "2026-11-04T11:20:17.760Z"
+    },
+    {
+      "id": "LOG-1793791213578-615",
+      "factory_id": "FAC-001",
+      "user_id": "USR-007",
+      "user_name": "Amit Deshmukh (Manager/Supervisor)",
+      "user_role": "MANAGER_SUPERVISOR",
+      "user_email": "manager.apex@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-007",
+      "details": "User Amit Deshmukh (Manager/Supervisor) (MANAGER_SUPERVISOR) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.578Z"
+    },
+    {
+      "id": "LOG-1793791213550-868",
+      "factory_id": "FAC-001",
+      "user_id": "USR-001",
+      "user_name": "Super Admin Officer",
+      "user_role": "SUPER_ADMIN",
+      "user_email": "superadmin@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-001",
+      "details": "User Super Admin Officer (SUPER_ADMIN) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.550Z"
+    },
+    {
+      "id": "LOG-1793791213601-666",
+      "factory_id": "FAC-001",
+      "user_id": "USR-012",
+      "user_name": "Ramesh Varma (Senior Technician)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.apex@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-012",
+      "details": "User Ramesh Varma (Senior Technician) (TECHNICIAN) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.601Z"
+    },
+    {
+      "id": "LOG-1793791213613-886",
+      "factory_id": "FAC-001",
+      "user_id": "USR-018",
+      "user_name": "Vikram Singh (Automation & Robotics Tech)",
+      "user_role": "TECHNICIAN",
+      "user_email": "tech.robotics@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-018",
+      "details": "User Vikram Singh (Automation & Robotics Tech) (TECHNICIAN) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.613Z"
+    },
+    {
+      "id": "LOG-1793791213586-132",
+      "factory_id": "FAC-001",
+      "user_id": "USR-015",
+      "user_name": "Priya Sundaram (Production Planner)",
+      "user_role": "PRODUCTION_PLANNER",
+      "user_email": "planner.apex@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-015",
+      "details": "User Priya Sundaram (Production Planner) (PRODUCTION_PLANNER) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.586Z"
+    },
+    {
+      "id": "LOG-1793791213569-843",
+      "factory_id": "FAC-001",
+      "user_id": "USR-002",
+      "user_name": "Rajesh Kumar (Plant Admin)",
+      "user_role": "ADMIN",
+      "user_email": "admin.apex@factoryops.com",
+      "action": "LOGIN_SUCCESS",
+      "entity_type": "User",
+      "entity_id": "USR-002",
+      "details": "User Rajesh Kumar (Plant Admin) (ADMIN) authenticated successfully",
+      "timestamp": "2026-11-04T11:20:13.569Z"
+    },
+    {
       "id": "LOG-1793726088606-548",
       "factory_id": "FAC-001",
       "user_id": "USR-007",
@@ -239818,7 +239974,7 @@
       "rating": 4.9,
       "completed_repairs_count": 87,
       "created_at": "2024-01-10T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.329Z"
+      "updated_at": "2026-11-04T11:25:57.592Z"
     },
     {
       "id": "TECH-002",
@@ -239853,7 +240009,7 @@
       "rating": 4.8,
       "completed_repairs_count": 64,
       "created_at": "2024-02-15T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.330Z"
+      "updated_at": "2026-11-04T11:25:57.593Z"
     },
     {
       "id": "TECH-003",
@@ -239887,7 +240043,7 @@
       "rating": 4.7,
       "completed_repairs_count": 53,
       "created_at": "2024-03-01T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.330Z"
+      "updated_at": "2026-11-04T11:25:57.593Z"
     },
     {
       "id": "TECH-004",
@@ -239922,7 +240078,7 @@
       "rating": 4.9,
       "completed_repairs_count": 72,
       "created_at": "2024-04-10T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.330Z"
+      "updated_at": "2026-11-04T11:25:57.593Z"
     },
     {
       "id": "TECH-005",
@@ -239957,7 +240113,7 @@
       "rating": 4.95,
       "completed_repairs_count": 115,
       "created_at": "2024-01-05T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.330Z"
+      "updated_at": "2026-11-04T11:25:57.593Z"
     },
     {
       "id": "TECH-006",
@@ -239992,7 +240148,7 @@
       "rating": 4.85,
       "completed_repairs_count": 48,
       "created_at": "2024-05-12T08:00:00Z",
-      "updated_at": "2026-11-03T19:16:45.330Z"
+      "updated_at": "2026-11-04T11:25:57.593Z"
     }
   ],
   "technicianAssignments": [
@@ -240807,6 +240963,118 @@
     }
   ],
   "notifications": [
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Anil Sharma (Technician) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791586172-565",
+      "created_at": "2026-11-04T11:26:26.172Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Anil Sharma (Technician) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791586083-949",
+      "created_at": "2026-11-04T11:26:26.083Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Vikram Singh (Automation & Robotics Tech) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791219907-416",
+      "created_at": "2026-11-04T11:20:19.907Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Vikram Singh (Automation & Robotics Tech) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791219817-254",
+      "created_at": "2026-11-04T11:20:19.817Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Ramesh Varma (Senior Technician) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791218839-429",
+      "created_at": "2026-11-04T11:20:18.839Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Ramesh Varma (Senior Technician) (TECHNICIAN) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791218754-320",
+      "created_at": "2026-11-04T11:20:18.754Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Priya Sundaram (Production Planner) (PRODUCTION_PLANNER) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791217849-340",
+      "created_at": "2026-11-04T11:20:17.849Z",
+      "is_read": false
+    },
+    {
+      "recipient_user_id": null,
+      "recipient_role": "SUPER_ADMIN",
+      "factory_id": "FAC-001",
+      "title": "Security Event: Unauthorized Access Attempt",
+      "message": "User Priya Sundaram (Production Planner) (PRODUCTION_PLANNER) attempted unauthorized action on GET /api/audit-logs",
+      "notification_type": "SECURITY_EVENT",
+      "priority": "CRITICAL",
+      "related_module": "Security & Access Control",
+      "target_path": "/system-health",
+      "id": "NOTIF-1793791217760-584",
+      "created_at": "2026-11-04T11:20:17.760Z",
+      "is_read": false
+    },
     {
       "recipient_user_id": null,
       "recipient_role": "PRODUCTION_PLANNER",
