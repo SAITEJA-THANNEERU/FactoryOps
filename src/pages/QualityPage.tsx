@@ -1,6 +1,7 @@
 import React from 'react';
 import { useData } from '../contexts/DataContext.tsx';
 import { CheckCircle2 } from 'lucide-react';
+import { TableLayoutProvider } from '../components/TableLayoutProvider.tsx';
 import { PowerBiVisualContainer, useIsFocusMode } from '../components/dashboard/PowerBiComponents.tsx';
 import {
   formatWholeNumber,
@@ -52,7 +53,7 @@ export const QualityPage: React.FC = () => {
         subtitle="Defective units, scrap generation, and yield rate per machine"
         heightClass="h-[420px]"
       >
-        <div className="w-full h-full overflow-x-auto overflow-y-auto">
+        <TableLayoutProvider maxHeightNormal="max-h-[350px]">
           <table className="w-full min-w-[500px] text-left text-xs">
             <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
@@ -80,7 +81,7 @@ export const QualityPage: React.FC = () => {
               })}
             </tbody>
           </table>
-        </div>
+        </TableLayoutProvider>
       </PowerBiVisualContainer>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TableLayoutProvider } from '../TableLayoutProvider.tsx';
 import type { Machine, Incident, TechnicianProfile, TechnicianIncidentAssignment } from '../../types/index.ts';
 import {
   Wrench,
@@ -450,7 +451,7 @@ export const ManagerAssignmentDashboard: React.FC<ManagerAssignmentDashboardProp
           </div>
 
           {/* Assignments Table */}
-          <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-sm">
+          <TableLayoutProvider maxHeightNormal="max-h-[500px]" className="rounded-xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
             <table className="w-full text-left text-xs text-slate-800">
               <thead className="bg-slate-100/90 text-slate-800 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold sticky top-0 z-10">
                 <tr>
@@ -627,7 +628,7 @@ export const ManagerAssignmentDashboard: React.FC<ManagerAssignmentDashboardProp
                 No incident repair assignments found matching filter "{pipelineStatusFilter}".
               </div>
             )}
-          </div>
+          </TableLayoutProvider>
         </div>
       )}
 

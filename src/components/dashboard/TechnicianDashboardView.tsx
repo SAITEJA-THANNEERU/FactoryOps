@@ -9,6 +9,7 @@ import {
   PowerBiVisualContainer,
   useIsFocusMode
 } from './PowerBiComponents.tsx';
+import { TableLayoutProvider } from '../TableLayoutProvider.tsx';
 import {
   formatWholeNumber
 } from '../../utils/formatters.ts';
@@ -459,43 +460,44 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
               </button>
             }
           >
-            <div className="h-full flex flex-col justify-between">
-              <div className="w-full overflow-x-auto overflow-y-auto max-h-[250px] text-xs">
-                <table className="w-full text-left border-collapse border border-slate-200 min-w-[650px]">
-                  <thead className="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200 font-bold text-[10.5px] uppercase tracking-wider">
-                    <tr>
-                      <th className="py-2 px-3 border-r border-slate-200">Type</th>
-                      <th className="py-2 px-3 border-r border-slate-200">Status</th>
-                      <th className="py-2 px-3 border-r border-slate-200 text-right">Duration (min)</th>
-                      <th className="py-2 px-3 border-r border-slate-200">Machine ID</th>
-                      <th className="py-2 px-3 border-r border-slate-200">Machine Name</th>
-                      <th className="py-2 px-3">Technician</th>
+            <TableLayoutProvider
+              maxHeightNormal="max-h-[250px]"
+              footer={
+                <div className="px-4 py-2 flex items-center justify-between text-xs font-bold text-[#191923]">
+                  <span className="text-slate-500 uppercase tracking-wider text-[10.5px]">Total Logged Duration</span>
+                  <span className="font-mono text-[#0E79B2] text-sm font-extrabold">{formatWholeNumber(totalMaintenanceDuration)} min</span>
+                </div>
+              }
+            >
+              <table className="w-full text-left border-collapse border border-slate-200 min-w-[650px]">
+                <thead className="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200 font-bold text-[10.5px] uppercase tracking-wider">
+                  <tr>
+                    <th className="py-2 px-3 border-r border-slate-200">Type</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Status</th>
+                    <th className="py-2 px-3 border-r border-slate-200 text-right">Duration (min)</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Machine ID</th>
+                    <th className="py-2 px-3 border-r border-slate-200">Machine Name</th>
+                    <th className="py-2 px-3">Technician</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700 font-mono text-[11px]">
+                  {maintenanceHistoryRows.slice(0, isFocusMode ? 100 : 30).map((row, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50/90 transition-colors">
+                      <td className="py-2 px-3 border-r border-slate-100 text-slate-900 font-sans font-medium">{row.maintenance_type}</td>
+                      <td className="py-2 px-3 border-r border-slate-100 font-sans">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                          {row.status}
+                        </span>
+                      </td>
+                      <td className="py-2 px-3 border-r border-slate-100 text-right text-slate-900 font-bold">{formatWholeNumber(row.duration_minutes)}</td>
+                      <td className="py-2 px-3 border-r border-slate-100 text-[#0E79B2] font-bold">{row.machine_id}</td>
+                      <td className="py-2 px-3 border-r border-slate-100 font-sans font-medium text-slate-900 truncate max-w-[160px]">{row.machine_name}</td>
+                      <td className="py-2 px-3 font-sans truncate max-w-[120px] text-slate-600">{row.technician_name}</td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-700 font-mono text-[11px]">
-                    {maintenanceHistoryRows.slice(0, isFocusMode ? 100 : 30).map((row, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/90 transition-colors">
-                        <td className="py-2 px-3 border-r border-slate-100 text-slate-900 font-sans font-medium">{row.maintenance_type}</td>
-                        <td className="py-2 px-3 border-r border-slate-100 font-sans">
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
-                            {row.status}
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 border-r border-slate-100 text-right text-slate-900 font-bold">{formatWholeNumber(row.duration_minutes)}</td>
-                        <td className="py-2 px-3 border-r border-slate-100 text-[#0E79B2] font-bold">{row.machine_id}</td>
-                        <td className="py-2 px-3 border-r border-slate-100 font-sans font-medium text-slate-900 truncate max-w-[160px]">{row.machine_name}</td>
-                        <td className="py-2 px-3 font-sans truncate max-w-[120px] text-slate-600">{row.technician_name}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="bg-slate-50 border-t border-slate-200 px-4 py-2 flex items-center justify-between text-xs font-bold text-[#191923] shrink-0">
-                <span className="text-slate-500 uppercase tracking-wider text-[10.5px]">Total Logged Duration</span>
-                <span className="font-mono text-[#0E79B2] text-sm font-extrabold">{formatWholeNumber(totalMaintenanceDuration)} min</span>
-              </div>
-            </div>
+                  ))}
+                </tbody>
+              </table>
+            </TableLayoutProvider>
           </PowerBiVisualContainer>
         </div>
       </div>
@@ -507,7 +509,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
           subtitle="Severity, Failure Categories & Problem Diagnoses across active lines"
           heightClass="h-[340px]"
         >
-          <div className="h-full w-full overflow-x-auto overflow-y-auto max-h-[265px] text-xs">
+          <TableLayoutProvider maxHeightNormal="max-h-[265px]">
             <table className="w-full text-left border-collapse border border-slate-200 min-w-[850px]">
               <thead className="bg-slate-50 text-slate-600 sticky top-0 border-b border-slate-200 font-bold text-[10.5px] uppercase tracking-wider z-10">
                 <tr>
@@ -560,7 +562,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                 ))}
               </tbody>
             </table>
-          </div>
+          </TableLayoutProvider>
         </PowerBiVisualContainer>
       </div>
 

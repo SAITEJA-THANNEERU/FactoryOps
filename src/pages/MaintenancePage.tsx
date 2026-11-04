@@ -4,6 +4,7 @@ import { StatusBadge } from '../components/StatusBadge.tsx';
 import { CreateWorkOrderModal } from '../components/CreateWorkOrderModal.tsx';
 import { LogMaintenanceModal } from '../components/LogMaintenanceModal.tsx';
 import { Wrench, Plus, Trash2, Calendar } from 'lucide-react';
+import { TableLayoutProvider } from '../components/TableLayoutProvider.tsx';
 import { formatDuration, formatCurrency } from '../utils/formatters.ts';
 import { useSearchHighlight } from '../utils/useSearchHighlight.ts';
 
@@ -102,7 +103,7 @@ export const MaintenancePage: React.FC = () => {
           <span>Maintenance Records & Tasks ({maintenance.length})</span>
           <span className="text-xs font-normal text-slate-500">Persisted in Supabase</span>
         </div>
-        <div className="w-full overflow-x-auto">
+        <TableLayoutProvider maxHeightNormal="max-h-[600px]">
           <table className="w-full min-w-[750px] text-left text-xs">
             <thead className="sticky top-0 bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold z-10">
               <tr className="bg-slate-50 text-slate-600 border-b border-slate-200 font-semibold">
@@ -153,7 +154,7 @@ export const MaintenancePage: React.FC = () => {
               })}
             </tbody>
           </table>
-        </div>
+        </TableLayoutProvider>
       </div>
 
       <CreateWorkOrderModal

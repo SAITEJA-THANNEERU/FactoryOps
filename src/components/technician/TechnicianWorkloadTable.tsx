@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { TableLayoutProvider } from '../TableLayoutProvider.tsx';
 import type { TechnicianProfile, TechnicianIncidentAssignment } from '../../types/index.ts';
 import {
   Users,
@@ -279,7 +280,7 @@ export const TechnicianWorkloadTable: React.FC<TechnicianWorkloadTableProps> = (
       </div>
 
       {/* Main Table */}
-      <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-sm">
+      <TableLayoutProvider maxHeightNormal="max-h-[600px]" className="rounded-xl border border-slate-200/90 bg-white shadow-sm overflow-hidden">
         <table className="w-full text-left text-xs text-slate-800">
           <thead className="bg-slate-100/90 text-slate-800 border-b border-slate-200 uppercase tracking-wider text-[10px] font-bold sticky top-0 z-10">
             <tr>
@@ -562,7 +563,7 @@ export const TechnicianWorkloadTable: React.FC<TechnicianWorkloadTableProps> = (
             </button>
           </div>
         )}
-      </div>
+      </TableLayoutProvider>
     </div>
   );
 };

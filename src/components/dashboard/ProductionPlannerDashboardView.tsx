@@ -6,6 +6,7 @@ import {
   PowerBiCard,
   PowerBiVisualContainer
 } from './PowerBiComponents.tsx';
+import { TableLayoutProvider } from '../TableLayoutProvider.tsx';
 import {
   formatWholeNumber,
   formatPercent,
@@ -999,175 +1000,173 @@ export const ProductionPlannerDashboardView: React.FC<ProductionPlannerDashboard
               </div>
 
               {/* Responsive Scrollable Table Container: Fixed Header, 15 Visible Rows Scrollable Body, Fixed Summary Footer */}
-              <div className="w-full overflow-x-auto">
-                <div className="overflow-y-auto max-h-[615px] relative border-t border-slate-200">
-                  <table className="w-full min-w-[950px] text-left text-xs text-slate-700 border-collapse">
-                    {/* Fixed Sticky Table Header */}
-                    <thead className="sticky top-0 z-20 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shadow-xs border-b border-slate-200">
-                      <tr>
-                        <th className="py-2.5 px-4 bg-slate-100">Machine ID</th>
-                        <th className="py-2.5 px-4 bg-slate-100">Machine Name / Type</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-center">Shift</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-right">Planned Units</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-right">Actual Units</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-right">Achievement %</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-right">Variance</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-right">Average OEE</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-center">Status</th>
-                        <th className="py-2.5 px-4 bg-slate-100 text-center">Actions</th>
-                      </tr>
-                    </thead>
+              <TableLayoutProvider maxHeightNormal="max-h-[615px]">
+                <table className="w-full min-w-[950px] text-left text-xs text-slate-700 border-collapse">
+                  {/* Fixed Sticky Table Header */}
+                  <thead className="sticky top-0 z-20 bg-slate-100 text-[10.5px] font-bold text-slate-500 uppercase tracking-wider shadow-xs border-b border-slate-200">
+                    <tr>
+                      <th className="py-2.5 px-4 bg-slate-100">Machine ID</th>
+                      <th className="py-2.5 px-4 bg-slate-100">Machine Name / Type</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-center">Shift</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-right">Planned Units</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-right">Actual Units</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-right">Achievement %</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-right">Variance</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-right">Average OEE</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-center">Status</th>
+                      <th className="py-2.5 px-4 bg-slate-100 text-center">Actions</th>
+                    </tr>
+                  </thead>
 
-                    {/* Vertically Scrollable Table Body (15 rows visible) */}
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {machineScheduleTableData.map((row) => {
-                        const isShortfall = row.variance < 0;
-                        const mObj = machines.find(m => m.machine_id === row.machine_id);
+                  {/* Vertically Scrollable Table Body (15 rows visible) */}
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {machineScheduleTableData.map((row) => {
+                      const isShortfall = row.variance < 0;
+                      const mObj = machines.find(m => m.machine_id === row.machine_id);
 
-                        return (
-                          <tr 
-                            key={row.machine_id}
-                            className="hover:bg-slate-50/80 transition-colors group h-[41px]"
-                          >
-                            {/* Machine ID */}
-                            <td className="py-2.5 px-4 font-mono font-bold text-slate-900">
-                              {row.machine_id}
-                            </td>
+                      return (
+                        <tr 
+                          key={row.machine_id}
+                          className="hover:bg-slate-50/80 transition-colors group h-[41px]"
+                        >
+                          {/* Machine ID */}
+                          <td className="py-2.5 px-4 font-mono font-bold text-slate-900">
+                            {row.machine_id}
+                          </td>
 
-                            {/* Machine Name / Type */}
-                            <td className="py-2.5 px-4">
-                              <div className="font-semibold text-slate-800">{row.machine_name}</div>
-                              <div className="text-[10px] text-slate-400">{row.type}</div>
-                            </td>
+                          {/* Machine Name / Type */}
+                          <td className="py-2.5 px-4">
+                            <div className="font-semibold text-slate-800">{row.machine_name}</div>
+                            <div className="text-[10px] text-slate-400">{row.type}</div>
+                          </td>
 
-                            {/* Shift */}
-                            <td className="py-2.5 px-4 text-center">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                                Shift {row.shift}
-                              </span>
-                            </td>
+                          {/* Shift */}
+                          <td className="py-2.5 px-4 text-center">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10.5px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                              Shift {row.shift}
+                            </span>
+                          </td>
 
-                            {/* Planned Units */}
-                            <td className="py-2.5 px-4 text-right font-mono font-medium text-slate-700 tabular-nums">
-                              {formatWholeNumber(row.planned)}
-                            </td>
+                          {/* Planned Units */}
+                          <td className="py-2.5 px-4 text-right font-mono font-medium text-slate-700 tabular-nums">
+                            {formatWholeNumber(row.planned)}
+                          </td>
 
-                            {/* Actual Units */}
-                            <td className="py-2.5 px-4 text-right font-mono font-bold text-[#0E79B2] tabular-nums">
-                              {formatWholeNumber(row.actual)}
-                            </td>
+                          {/* Actual Units */}
+                          <td className="py-2.5 px-4 text-right font-mono font-bold text-[#0E79B2] tabular-nums">
+                            {formatWholeNumber(row.actual)}
+                          </td>
 
-                            {/* Achievement % */}
-                            <td className="py-2.5 px-4 text-right font-mono font-bold tabular-nums">
-                              <span className={row.achievement >= 90 ? 'text-emerald-600' : 'text-amber-600'}>
-                                {formatPercent(row.achievement, 1)}
-                              </span>
-                            </td>
+                          {/* Achievement % */}
+                          <td className="py-2.5 px-4 text-right font-mono font-bold tabular-nums">
+                            <span className={row.achievement >= 90 ? 'text-emerald-600' : 'text-amber-600'}>
+                              {formatPercent(row.achievement, 1)}
+                            </span>
+                          </td>
 
-                            {/* Variance */}
-                            <td className="py-2.5 px-4 text-right font-mono font-bold tabular-nums">
-                              <span className={`inline-flex items-center gap-1 ${isShortfall ? 'text-[#EF4444]' : 'text-emerald-600'}`}>
-                                {isShortfall ? (
-                                  <>
-                                    <TrendingDown className="w-3 h-3 shrink-0" />
-                                    <span>{formatWholeNumber(row.variance)}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <TrendingUp className="w-3 h-3 shrink-0" />
-                                    <span>+{formatWholeNumber(row.variance)}</span>
-                                  </>
-                                )}
-                              </span>
-                            </td>
+                          {/* Variance */}
+                          <td className="py-2.5 px-4 text-right font-mono font-bold tabular-nums">
+                            <span className={`inline-flex items-center gap-1 ${isShortfall ? 'text-[#EF4444]' : 'text-emerald-600'}`}>
+                              {isShortfall ? (
+                                <>
+                                  <TrendingDown className="w-3 h-3 shrink-0" />
+                                  <span>{formatWholeNumber(row.variance)}</span>
+                                </>
+                              ) : (
+                                <>
+                                  <TrendingUp className="w-3 h-3 shrink-0" />
+                                  <span>+{formatWholeNumber(row.variance)}</span>
+                                </>
+                              )}
+                            </span>
+                          </td>
 
-                            {/* Average OEE */}
-                            <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-800 tabular-nums">
-                              {formatNumber(row.avgOee, 1)}%
-                            </td>
+                          {/* Average OEE */}
+                          <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-800 tabular-nums">
+                            {formatNumber(row.avgOee, 1)}%
+                          </td>
 
-                            {/* Status */}
-                            <td className="py-2.5 px-4 text-center">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                          {/* Status */}
+                          <td className="py-2.5 px-4 text-center">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                              row.status.toLowerCase() === 'running' || row.status.toLowerCase() === 'active'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                : row.status.toLowerCase() === 'warning'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-rose-50 text-rose-700 border-rose-200'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
                                 row.status.toLowerCase() === 'running' || row.status.toLowerCase() === 'active'
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  ? 'bg-emerald-500'
                                   : row.status.toLowerCase() === 'warning'
-                                  ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                  : 'bg-rose-50 text-rose-700 border-rose-200'
-                              }`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${
-                                  row.status.toLowerCase() === 'running' || row.status.toLowerCase() === 'active'
-                                    ? 'bg-emerald-500'
-                                    : row.status.toLowerCase() === 'warning'
-                                    ? 'bg-amber-500'
-                                    : 'bg-rose-500'
-                                }`}></span>
-                                <span className="capitalize">{row.status}</span>
-                              </span>
-                            </td>
+                                  ? 'bg-amber-500'
+                                  : 'bg-rose-500'
+                              }`}></span>
+                              <span className="capitalize">{row.status}</span>
+                            </span>
+                          </td>
 
-                            {/* Actions */}
-                            <td className="py-2.5 px-4 text-center">
-                              <button
-                                onClick={() => {
-                                  if (mObj) onSelectMachine(mObj);
-                                }}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#0E79B2] hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
-                              >
-                                <span>Inspect</span>
-                                <ArrowUpRight className="w-3 h-3" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-
-                      {machineScheduleTableData.length === 0 && (
-                        <tr>
-                          <td colSpan={10} className="py-8 text-center text-slate-400 text-xs">
-                            No machine schedule records match the current filters.
+                          {/* Actions */}
+                          <td className="py-2.5 px-4 text-center">
+                            <button
+                              onClick={() => {
+                                if (mObj) onSelectMachine(mObj);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold text-[#0E79B2] hover:bg-blue-50 rounded-md transition-colors cursor-pointer"
+                            >
+                              <span>Inspect</span>
+                              <ArrowUpRight className="w-3 h-3" />
+                            </button>
                           </td>
                         </tr>
-                      )}
-                    </tbody>
+                      );
+                    })}
 
-                    {/* Permanently Visible Non-Scrolling Sticky Summary / Footer */}
-                    {machineScheduleTableData.length > 0 && (
-                      <tfoot className="sticky bottom-0 z-20 bg-slate-50 font-bold text-xs text-slate-900 border-t-2 border-slate-200 shadow-md">
-                        <tr>
-                          <td colSpan={3} className="py-2.5 px-4 uppercase tracking-wider text-slate-600 bg-slate-50">
-                            Total / Summary ({machineScheduleTableData.length} Machines)
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
-                            {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0))}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-[#0E79B2] bg-slate-50">
-                            {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.actual, 0))}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-emerald-600 bg-slate-50">
-                            {formatPercent(
-                              machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0) > 0
-                                ? (machineScheduleTableData.reduce((acc, r) => acc + r.actual, 0) / machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0)) * 100
-                                : 0,
-                              1
-                            )}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
-                            {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.variance, 0))}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
-                            {formatNumber(
-                              machineScheduleTableData.reduce((acc, r) => acc + r.avgOee, 0) / machineScheduleTableData.length,
-                              1
-                            )}%
-                          </td>
-                          <td colSpan={2} className="bg-slate-50"></td>
-                        </tr>
-                      </tfoot>
+                    {machineScheduleTableData.length === 0 && (
+                      <tr>
+                        <td colSpan={10} className="py-8 text-center text-slate-400 text-xs">
+                          No machine schedule records match the current filters.
+                        </td>
+                      </tr>
                     )}
-                  </table>
-                </div>
-              </div>
+                  </tbody>
+
+                  {/* Permanently Visible Non-Scrolling Sticky Summary / Footer */}
+                  {machineScheduleTableData.length > 0 && (
+                    <tfoot className="sticky bottom-0 z-20 bg-slate-50 font-bold text-xs text-slate-900 border-t-2 border-slate-200 shadow-md">
+                      <tr>
+                        <td colSpan={3} className="py-2.5 px-4 uppercase tracking-wider text-slate-600 bg-slate-50">
+                          Total / Summary ({machineScheduleTableData.length} Machines)
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
+                          {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0))}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-[#0E79B2] bg-slate-50">
+                          {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.actual, 0))}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-emerald-600 bg-slate-50">
+                          {formatPercent(
+                            machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0) > 0
+                              ? (machineScheduleTableData.reduce((acc, r) => acc + r.actual, 0) / machineScheduleTableData.reduce((acc, r) => acc + r.planned, 0)) * 100
+                              : 0,
+                            1
+                          )}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
+                          {formatWholeNumber(machineScheduleTableData.reduce((acc, r) => acc + r.variance, 0))}
+                        </td>
+                        <td className="py-2.5 px-4 text-right font-mono text-slate-800 bg-slate-50">
+                          {formatNumber(
+                            machineScheduleTableData.reduce((acc, r) => acc + r.avgOee, 0) / machineScheduleTableData.length,
+                            1
+                          )}%
+                        </td>
+                        <td colSpan={2} className="bg-slate-50"></td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </TableLayoutProvider>
             </div>
           </section>
 

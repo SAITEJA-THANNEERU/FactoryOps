@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import type { SystemAuditLog } from '../types';
 import { ShieldCheck, RefreshCw, Search, Clock, User, Activity, Filter } from 'lucide-react';
+import { TableLayoutProvider } from './TableLayoutProvider.tsx';
 
 export const SystemAuditLogView: React.FC = () => {
   const [logs, setLogs] = useState<SystemAuditLog[]>([]);
@@ -113,10 +114,10 @@ export const SystemAuditLogView: React.FC = () => {
           No audit log entries found matching criteria.
         </div>
       ) : (
-        <div className="overflow-x-auto">
+        <TableLayoutProvider maxHeightNormal="max-h-[500px]">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold uppercase">
+              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-semibold uppercase sticky top-0 z-10">
                 <th className="py-2.5 px-3">Timestamp</th>
                 <th className="py-2.5 px-3">User / Role</th>
                 <th className="py-2.5 px-3">Action</th>
@@ -149,7 +150,7 @@ export const SystemAuditLogView: React.FC = () => {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableLayoutProvider>
       )}
     </div>
   );
