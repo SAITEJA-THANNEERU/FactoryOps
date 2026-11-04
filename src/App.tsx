@@ -25,6 +25,7 @@ import { DataQualityPage } from './pages/DataQualityPage.tsx';
 import { AdminPage } from './pages/AdminPage.tsx';
 import { InventoryPage } from './pages/InventoryPage.tsx';
 import { AttendanceHubPage } from './pages/AttendanceHubPage.tsx';
+import { MyAssignedTasksPage } from './pages/MyAssignedTasksPage.tsx';
 import { AIChatLauncher } from './components/AIChatLauncher.tsx';
 
 import { RefreshCw, Factory as FactoryIcon, ShieldAlert } from 'lucide-react';
@@ -114,6 +115,9 @@ const AppContent: React.FC = () => {
       case '/dashboard':
       case '/':
         return <DashboardPage />;
+      case '/assigned-tasks':
+      case '/my-assigned-tasks':
+        return <MyAssignedTasksPage />;
       case '/operations':
         return <OperationsPage />;
       case '/production':

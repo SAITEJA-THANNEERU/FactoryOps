@@ -2,6 +2,8 @@ import type { UserRole } from '../types/index.ts';
 
 export type AppRoute =
   | '/dashboard'
+  | '/assigned-tasks'
+  | '/my-assigned-tasks'
   | '/operations'
   | '/production'
   | '/machines'
@@ -346,6 +348,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   TECHNICIAN: {
     allowedRoutes: [
       '/dashboard',
+      '/assigned-tasks',
+      '/my-assigned-tasks',
       '/attendance',
       '/my-attendance',
       '/inventory',
@@ -382,6 +386,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, RolePermissions> = {
   OPERATOR: {
     allowedRoutes: [
       '/dashboard',
+      '/assigned-tasks',
+      '/my-assigned-tasks',
       '/attendance',
       '/my-attendance',
       '/inventory',

@@ -55,6 +55,7 @@ export const MobileNavDrawer: React.FC<MobileNavDrawerProps> = ({
       case 'OPERATOR':
         return [
           { path: '/dashboard', label: 'My Dashboard', icon: LayoutDashboard },
+          { path: '/assigned-tasks', label: 'My Assigned Tasks', icon: ClipboardList },
           { path: '/attendance', label: 'My Attendance', icon: CalendarCheck },
           { path: '/inventory', label: 'Spare Parts', icon: Package },
           { path: '/work-orders', label: 'My Work Orders', icon: ClipboardList },

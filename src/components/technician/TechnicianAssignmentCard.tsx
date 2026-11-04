@@ -40,6 +40,8 @@ interface TechnicianAssignmentCardProps {
   }) => Promise<void>;
   isManagerView?: boolean;
   onVerify?: (id: string) => void;
+  isHighlighted?: boolean;
+  defaultExpanded?: boolean;
 }
 
 export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> = ({
@@ -51,9 +53,17 @@ export const TechnicianAssignmentCard: React.FC<TechnicianAssignmentCardProps> =
   onUpdateProgress,
   onResolve,
   isManagerView = false,
-  onVerify
+  onVerify,
+  isHighlighted = false,
+  defaultExpanded = false
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState<boolean>(defaultExpanded || isHighlighted);
+
+  React.useEffect(() => {
+    if (isHighlighted || defaultExpanded) {
+      setIsExpanded(true);
+    }
+  }, [isHighlighted, defaultExpanded]);
   const [showHistory, setShowHistory] = useState(false);
   const [showProgressUpdates, setShowProgressUpdates] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

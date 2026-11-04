@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useData } from '../contexts/DataContext.tsx';
 import { useRouter } from '../contexts/RouterContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import {
   Bell,
   X,
@@ -32,6 +33,7 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
   onClose,
   anchorRef
 }) => {
+  const { user } = useAuth();
   const {
     notifications,
     unreadNotificationsCount,
@@ -102,23 +104,31 @@ export const NotificationPopover: React.FC<NotificationPopoverProps> = ({
     const mod = (notification.related_module || '').toLowerCase();
     const type = (notification.notification_type || notification.type || '').toLowerCase();
     const recordId = notification.related_record_id;
+    const isTechUser = user?.role === 'TECHNICIAN' || user?.role === 'OPERATOR';
+    const isTechRecipient = notification.recipient_role === 'TECHNICIAN' || notification.recipient_role === 'OPERATOR';
 
-    if (mod.includes('incident') || type.includes('incident')) {
-      target = '/incidents';
+    if (
+      (isTechUser || isTechRecipient) &&
+      (target.includes('technician-dashboard') || target.includes('assigned-tasks') || type.includes('assignment') || type.includes('repair') || mod.includes('assignment'))
+    ) {
+      target = '/assigned-tasks';
+    } else if (mod.includes('incident') || type.includes('incident')) {
+      target = isTechUser ? '/assigned-tasks' : '/incidents';
     } else if (mod.includes('work') || type.includes('work_order') || type.includes('assignment') || type.includes('technician_assignment')) {
-      target = '/work-orders';
+      target = isTechUser ? '/assigned-tasks' : '/work-orders';
     } else if (mod.includes('machine') || type.includes('machine') || type.includes('telemetry')) {
       target = '/machines';
     } else if (mod.includes('production') || type.includes('production')) {
       target = '/production';
     } else if (mod.includes('maintenance')) {
-      target = '/maintenance';
+      target = isTechUser ? '/assigned-tasks' : '/maintenance';
     } else if (mod.includes('inventory') || type.includes('inventory')) {
       target = '/inventory';
     } else if (mod.includes('security') || type.includes('security') || type.includes('system')) {
       target = '/super-admin/overview';
     } else if (target.includes('dashboard')) {
-      if (mod.includes('incident')) target = '/incidents';
+      if (isTechUser) target = '/assigned-tasks';
+      else if (mod.includes('incident')) target = '/incidents';
       else if (mod.includes('work')) target = '/work-orders';
       else if (mod.includes('machine')) target = '/machines';
       else if (mod.includes('production')) target = '/production';
