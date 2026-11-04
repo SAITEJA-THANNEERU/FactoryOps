@@ -350,6 +350,9 @@ export const PowerBiCard: React.FC<PowerBiCardProps> = ({
   );
 };
 
+export const FocusModeContext = React.createContext<boolean>(false);
+export const useIsFocusMode = () => React.useContext(FocusModeContext);
+
 /**
  * Modern Visual Container Box with clean white card & header
  */
@@ -389,7 +392,7 @@ export const PowerBiVisualContainer: React.FC<PowerBiVisualContainerProps> = ({
   }, [isExpanded]);
 
   return (
-    <>
+    <FocusModeContext.Provider value={isExpanded}>
       <div className={`bg-white border border-slate-200/90 hover:border-slate-300 rounded-xl shadow-2xs hover:shadow-xs transition-all duration-200 motion-reduce:transition-none overflow-hidden flex flex-col ${heightClass}`}>
         <div className="px-3.5 py-2.5 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
           <div className="truncate pr-2">
@@ -425,11 +428,11 @@ export const PowerBiVisualContainer: React.FC<PowerBiVisualContainerProps> = ({
       {isExpanded &&
         createPortal(
           <div
-            className="fixed inset-0 z-[9999] flex items-center justify-center p-3 sm:p-6 md:p-8 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200"
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 bg-slate-900/70 backdrop-blur-md animate-in fade-in duration-200"
             onClick={() => setIsExpanded(false)}
           >
             <div
-              className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-5xl h-[82vh] max-h-[900px] flex flex-col overflow-hidden relative animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
+              className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-6xl xl:max-w-7xl h-[88vh] max-h-[920px] flex flex-col overflow-hidden relative animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Focus Mode Header */}
@@ -465,13 +468,14 @@ export const PowerBiVisualContainer: React.FC<PowerBiVisualContainerProps> = ({
               </div>
 
               {/* Focus Mode Body with fully interactive visual content */}
-              <div className="flex-1 p-4 sm:p-6 overflow-auto bg-white relative flex flex-col min-h-0">
+              <div className="flex-1 p-4 sm:p-6 overflow-hidden bg-white relative flex flex-col min-h-0 focus-mode-modal-body">
                 {children}
               </div>
             </div>
           </div>,
           document.body
         )}
-    </>
+    </FocusModeContext.Provider>
   );
 };
+

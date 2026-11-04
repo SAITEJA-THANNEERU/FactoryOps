@@ -6,7 +6,8 @@ import { TechnicianAssignmentCard } from '../technician/TechnicianAssignmentCard
 import {
   PowerBiBanner,
   PowerBiCard,
-  PowerBiVisualContainer
+  PowerBiVisualContainer,
+  useIsFocusMode
 } from './PowerBiComponents.tsx';
 import {
   formatWholeNumber
@@ -282,6 +283,8 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
     ];
   }, [incidents]);
 
+  const isFocusMode = useIsFocusMode();
+
   return (
     <div className="max-w-[1850px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 font-sans text-slate-900">
       {/* 1. TECHNICIAN PROFILE HEADER CARD (White, FactoryOps Reference Matching) */}
@@ -470,7 +473,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-700 font-mono text-[11px]">
-                    {maintenanceHistoryRows.slice(0, 30).map((row, idx) => (
+                    {maintenanceHistoryRows.slice(0, isFocusMode ? 100 : 30).map((row, idx) => (
                       <tr key={idx} className="hover:bg-slate-50/90 transition-colors">
                         <td className="py-2 px-3 border-r border-slate-100 text-slate-900 font-sans font-medium">{row.maintenance_type}</td>
                         <td className="py-2 px-3 border-r border-slate-100 font-sans">
@@ -519,7 +522,7 @@ export const TechnicianDashboardView: React.FC<TechnicianDashboardViewProps> = (
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
-                {incidentRows.slice(0, 30).map((row, idx) => (
+                {incidentRows.slice(0, isFocusMode ? 100 : 30).map((row, idx) => (
                   <tr key={idx} className="hover:bg-slate-50/90 transition-colors">
                     <td className="py-2 px-3 border-r border-slate-100 font-mono text-[#0E79B2] font-extrabold">{row.incident_id}</td>
                     <td className="py-2 px-3 border-r border-slate-100 font-bold text-slate-900 truncate max-w-[180px]">{row.machine_name}</td>

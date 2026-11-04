@@ -1,7 +1,7 @@
 import React from 'react';
 import { useData } from '../contexts/DataContext.tsx';
 import { CheckCircle2 } from 'lucide-react';
-import { PowerBiVisualContainer } from '../components/dashboard/PowerBiComponents.tsx';
+import { PowerBiVisualContainer, useIsFocusMode } from '../components/dashboard/PowerBiComponents.tsx';
 import {
   formatWholeNumber,
   formatPercent,
@@ -10,6 +10,7 @@ import {
 
 export const QualityPage: React.FC = () => {
   const { kpis, production } = useData();
+  const isFocusMode = useIsFocusMode();
 
   const totalDefects = production.reduce((acc, p) => acc + p.defective_units, 0);
   const totalScrapKg = production.reduce((acc, p) => acc + p.scrap_kg, 0);
@@ -63,7 +64,7 @@ export const QualityPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 text-slate-700">
-              {production.slice(0, 15).map(p => {
+              {production.slice(0, isFocusMode ? 100 : 15).map(p => {
                 const yieldRate = p.actual_units > 0
                   ? ((p.actual_units - p.defective_units) / p.actual_units) * 100
                   : 100;

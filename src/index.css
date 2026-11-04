@@ -199,3 +199,55 @@ svg *:focus-visible {
   outline: none !important;
 }
 
+/* ==========================================================================
+   Visual Focus Mode Table & Container Layout Enhancements
+   Ensures tables fill modal height & width without unused white space
+   ========================================================================== */
+.focus-mode-modal-body {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  overflow: hidden !important;
+}
+
+/* Allow immediate container children inside focus mode modal body to stretch vertically */
+.focus-mode-modal-body > div {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 0% !important;
+  max-height: none !important;
+  width: 100% !important;
+}
+
+/* Override fixed max-height constraints on scrollable table wrappers inside focus mode */
+.focus-mode-modal-body .overflow-y-auto,
+.focus-mode-modal-body .overflow-auto,
+.focus-mode-modal-body [class*="max-h-"] {
+  max-height: none !important;
+  height: 100% !important;
+  flex: 1 1 0% !important;
+  min-height: 0 !important;
+}
+
+/* Ensure sticky table headers remain sticky at top of focus mode modal body */
+.focus-mode-modal-body table thead {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 20 !important;
+}
+
+/* Ensure tables fill 100% available container width */
+.focus-mode-modal-body table {
+  width: 100% !important;
+}
+
+/* Ensure summary/footer rows stay pinned at bottom without shrinking */
+.focus-mode-modal-body .shrink-0 {
+  flex-shrink: 0 !important;
+}
+
+
