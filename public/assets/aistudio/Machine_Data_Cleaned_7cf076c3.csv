@@ -1,0 +1,25 @@
+machine_id,machine_name,line_id,line_name,station_number,machine_type,manufacturer,model,serial_number,installation_date,target_cycle_time_seconds,rated_capacity_uph,power_rating_kw,maintenance_interval_days,status
+M020,Electrostatic Powder Coating Booth 01,L04,Coating & Packaging Line 4,ST-02,Powder Coating Booth,Gema,MagicCompact,SN-L04-M020-2022,2022-11-12,51,71,26.0,30,Active
+M017,Shot Blasting Chamber 01,L03,Welding Line 3,ST-05,Surface Shot Blaster,Rösler,RWT-600,SN-L03-M017-2023,2023-03-05,48,75,40.0,30,Active
+M015,Automated Resistance Spot Welder 01,L03,Welding Line 3,ST-03,Spot Welding Gantry,ARO,Ergoflex 150,SN-L03-M015-2023,2023-02-01,76,47,32.0,30,Active
+M013,Robotic MIG Welding Cell 01,L03,Welding Line 3,ST-01,Articulated Robot Welder,Fanuc,ARC Mate 120iD,SN-L03-M013-2023,2023-01-10,64,56,24.0,30,Active
+M012,3D Optical Scanner Station 01,L02,Stamping Line 2,ST-06,Optical Surface Scanner,GOM,ATOS Q,SN-L02-M012-2021,2021-10-12,52,69,7.5,60,Active
+M018,Laser Ultrasonic Weld Inspector 01,L03,Welding Line 3,ST-06,NDT Weld Inspection System,Olympus,OmniScan X3,SN-L03-M018-2023,2023-03-20,65,55,6.0,60,Active
+M007,Hydraulic Stamping Press 01,L02,Stamping Line 2,ST-01,Servo Hydraulic Press,Schuler,MSD-250,SN-L02-M007-2021,2021-08-10,53,68,45.0,30,Active
+M004,Precision Cylindrical Grinder 01,L01,Machining Line 1,ST-04,CNC Cylindrical Grinder,Studer,S33 CNC,SN-L01-M004-2022,2022-04-12,96,38,15.0,30,Active
+M014,Robotic MIG Welding Cell 02,L03,Welding Line 3,ST-02,Articulated Robot Welder,ABB,IRB 1600ID,SN-L03-M014-2023,2023-01-15,69,52,24.0,30,Active
+M006,Automated CMM Inspection Cell 01,L01,Machining Line 1,ST-06,Coordinate Measuring Machine,Zeiss,DuraMax 500,SN-L01-M006-2022,2022-05-15,70,51,8.5,60,Active
+M011,Sheet Edge Finishing Machine 01,L02,Stamping Line 2,ST-05,Edge Deburrer & Beveler,Timesavers,22-Series,SN-L02-M011-2021,2021-10-01,59,61,14.0,45,Active
+M024,End-of-Line Palletizer Cell 01,L04,Coating & Packaging Line 4,ST-06,Robotic Case Palletizer,Fanuc,M-410iC/185,SN-L04-M024-2022,2022-12-22,45,80,20.0,30,Active
+M016,Pneumatic Assembly Fixture 01,L03,Welding Line 3,ST-04,Assembly Clamping Cell,KUKA,KR 16 R2010,SN-L03-M016-2023,2023-02-18,56,64,18.0,45,Active
+M019,Automated 5-Stage Chemical Wash 01,L04,Coating & Packaging Line 4,ST-01,Pre-Treatment Wash System,Eisenmann,VarioClean 5,SN-L04-M019-2022,2022-11-05,54,67,38.0,45,Active
+M003,Multi-Spindle Drilling Machine 01,L01,Machining Line 1,ST-03,Drilling & Tapping Machine,Brother,Speedio S700,SN-L01-M003-2022,2022-04-05,44,82,18.5,30,Active
+M005,Thermal Deburring Station 01,L01,Machining Line 1,ST-05,Deburring System,Extrude Hone,TEM-800,SN-L01-M005-2022,2022-05-01,60,60,12.0,45,Active
+M010,High-Speed Turret Punch 01,L02,Stamping Line 2,ST-04,Turret Punch Press,Prima Power,Punch Genius,SN-L02-M010-2021,2021-09-15,46,78,28.0,30,Active
+M008,Fiber Laser Cutting System 01,L02,Stamping Line 2,ST-02,Fiber Laser Cutter,Trumpf,TruLaser 3030,SN-L02-M008-2021,2021-08-18,50,72,35.0,30,Active
+M001,CNC Turning Center 01,L01,Machining Line 1,ST-01,CNC Lathe,DMG MORI,CTX beta 800,SN-L01-M001-2022,2022-03-15,55,65,22.5,30,Active
+M002,Vertical Machining Center 01,L01,Machining Line 1,ST-02,5-Axis Milling Machine,Mazak,Variaxis i-700,SN-L01-M002-2022,2022-03-20,67,54,30.0,30,Active
+M023,Protective Film Laminating Unit 01,L04,Coating & Packaging Line 4,ST-05,Surface Laminator,Walco,60A Series,SN-L04-M023-2022,2022-12-15,48,75,9.5,45,Active
+M022,Multi-Head Automatic Riveter 01,L04,Coating & Packaging Line 4,ST-04,Automated Riveting System,BalTec,RNE 381,SN-L04-M022-2022,2022-12-02,50,72,11.0,30,Active
+M021,Infrared Convection Curing Tunnel 01,L04,Coating & Packaging Line 4,ST-03,Thermal Curing Tunnel,Dürr,EcoInfrarot,SN-L04-M021-2022,2022-11-20,44,82,55.0,30,Active
+M009,CNC Hydraulic Press Brake 01,L02,Stamping Line 2,ST-03,CNC Press Brake,Amada,HG-1003,SN-L02-M009-2021,2021-09-02,63,57,16.5,30,Active

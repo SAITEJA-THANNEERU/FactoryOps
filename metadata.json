@@ -1,0 +1,8 @@
+{
+  "name": "Remix FactoryOps_copy",
+  "description": "Imported from GitHub: SAITEJA-THANNEERU/FactoryOps",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
